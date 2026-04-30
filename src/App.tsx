@@ -1737,7 +1737,6 @@ export default function App() {
                       <table className="w-full text-left border-collapse">
                         <thead>
                           <tr className="bg-slate-50 border-b border-slate-200">
-                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider bg-lime-400 border-r border-slate-200 text-center">Год</th>
                             <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider bg-lime-400 border-r border-slate-200 text-center">Возраст (лет)</th>
                             <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider bg-lime-400 border-r border-slate-200 text-center">Возраст (мес)</th>
                             <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider bg-lime-400 border-r border-slate-200 text-center">lx (Муж)</th>
@@ -1751,10 +1750,6 @@ export default function App() {
                             
                             if (mortalityTableParams.viewMode === 'months') {
                               for (let i = 0; i < totalCount; i++) {
-                                const totalMonths = (mortalityTableParams.startYear * 12) + i;
-                                const year = Math.floor(totalMonths / 12);
-                                const month = (totalMonths % 12) + 1;
-                                
                                 const totalAgeMonths = (mortalityTableParams.startAge * 12) + i;
                                 const ageYears = Math.floor(totalAgeMonths / 12);
                                 const ageMonths = totalAgeMonths % 12;
@@ -1764,7 +1759,6 @@ export default function App() {
 
                                 rows.push(
                                   <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-3.5 font-bold text-slate-700 border-r border-slate-100 bg-slate-50/30 text-center">{month.toString().padStart(2, '0')}.{year}</td>
                                     <td className="px-6 py-3.5 text-slate-600 font-semibold border-r border-slate-100 text-center">{ageYears}</td>
                                     <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center">{ageMonths}</td>
                                     <td className="px-6 py-3.5 text-slate-600 font-mono text-sm text-center p-0 border-r border-slate-100">
@@ -1788,7 +1782,6 @@ export default function App() {
                               }
                             } else {
                               for (let i = 0; i < totalCount; i++) {
-                                const year = mortalityTableParams.startYear + (i * mortalityTableParams.step);
                                 const age = mortalityTableParams.startAge + (i * mortalityTableParams.step);
                                 
                                 const valMale = getLxValue(age, 0, 'Муж');
@@ -1796,7 +1789,6 @@ export default function App() {
 
                                 rows.push(
                                   <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-3.5 font-bold text-slate-700 border-r border-slate-100 bg-slate-50/30 text-center">{year}</td>
                                     <td className="px-6 py-3.5 text-slate-600 font-semibold border-r border-slate-100 text-center">{age}</td>
                                     <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center">0</td>
                                     <td className="px-6 py-3.5 text-slate-600 font-mono text-sm text-center p-0 border-r border-slate-100">
