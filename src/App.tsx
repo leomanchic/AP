@@ -21,8 +21,28 @@ import {
   Circle,
   ChevronDown,
   Database,
-  GitGraph
+  GitGraph,
+  FileUp,
+  FileDown
 } from 'lucide-react';
+
+// --- Utilities ---
+const MONTHS_LIST = [
+  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+];
+
+const downloadCSV = (filename: string, csvContent: string) => {
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
 
 // --- Types ---
 
@@ -683,7 +703,6 @@ export default function App() {
 
   // Parameters for Mortality Table (General)
   const [mortalityTableParams, setMortalityTableParams] = useState({
-    startYear: 2024,
     startAge: 0,
     step: 1,
     count: 50,
@@ -738,6 +757,48 @@ export default function App() {
     '55-Ж': '1.0'
   });
   const [retirementProbsNonAccum, setRetirementProbsNonAccum] = useState<Record<string, string>>({});
+  
+  // Overrides for Expenses
+  const [expenseOverrides, setExpenseOverrides] = useState<Record<string, { uk_const?: string, uk_var?: string, asv?: string, sd?: string, vf_const?: string, vf_var?: string }>>({});
+
+  // Overrides for Termination
+  const [terminationOverrides, setTerminationOverrides] = useState<Record<string, string>>({});
+
+  // Overrides for Mortality Reduction
+  const [mortalityReductionOverrides, setMortalityReductionOverrides] = useState<Record<string, { male: string, female: string }>>({});
+
+  // Overrides for Life Tariffs
+  const [lifeTariffOverrides, setLifeTariffOverrides] = useState<Record<string, { male: string, female: string }>>({});
+
+  // Overrides for Term Tariffs
+  const [termTariffOverrides, setTermTariffOverrides] = useState<Record<string, { male: string, female: string }>>({});
+
+  const getLifeTariffVal = (code: string, age: number) => {
+    const key = `${code}-${age}`;
+    return lifeTariffOverrides[key] || {
+      male: (12.5 + (code.length * 0.1)).toFixed(4),
+      female: (14.2 + (code.length * 0.1)).toFixed(4)
+    };
+  };
+
+  const getTermTariffVal = (code: string, age: number, term: number) => {
+    const key = `${code}-${age}-${term}`;
+    return termTariffOverrides[key] || {
+      male: (8.5 + (term * 0.2)).toFixed(4),
+      female: (9.2 + (term * 0.2)).toFixed(4)
+    };
+  };
+
+  const getMortalityReduction = (age: number) => {
+    return mortalityReductionOverrides[age.toString()] || { 
+      male: (1 - Math.exp(-age / 100)).toFixed(4), 
+      female: (1 - Math.exp(-age / 110)).toFixed(4) 
+    };
+  };
+
+  const getTerminationProb = (term: number) => {
+    return terminationOverrides[term.toString()] || (0.15 * Math.exp(-term / 10)).toFixed(4);
+  };
 
   const getRetirementProb = (age: number, gender: string) => {
     const data = retirementParams.type === 'accumulative' ? retirementProbsAccum : retirementProbsNonAccum;
@@ -772,17 +833,18 @@ export default function App() {
   ];
 
   const generatedMortalityRows = useMemo(() => {
-// ... rest of the function
     const rows = [];
     for (let i = 0; i < mortalityParams.count; i++) {
+      const age = mortalityParams.startAge + (i * mortalityParams.step);
+      const val = getMortalityReduction(age);
       rows.push({
-        age: mortalityParams.startAge + (i * mortalityParams.step),
-        male: (0.85 + Math.random() * 0.1).toFixed(4),
-        female: (0.92 + Math.random() * 0.05).toFixed(4)
+        age,
+        male: val.male,
+        female: val.female
       });
     }
     return rows;
-  }, [mortalityParams]);
+  }, [mortalityParams, mortalityReductionOverrides]);
 
   const filteredNpoParams = useMemo(() => {
 // ... rest of the function
@@ -1007,28 +1069,71 @@ export default function App() {
                             <td className="px-8 py-4 border-b border-slate-100">
                               <code className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 font-mono">{param.id}</code>
                             </td>
-                            <td className="px-8 py-4 border-b border-slate-100">
-                              <select 
-                                value={FILL_METHODS.includes(data.method) ? data.method : 'Ручной ввод'}
-                                onChange={(e) => updateCalcParamData(param.id, 'method', e.target.value)}
-                                className="text-sm text-slate-600 bg-transparent border-none focus:ring-0 cursor-pointer hover:text-blue-600 transition-colors w-full"
-                              >
-                                {!FILL_METHODS.includes(param.method) && (
-                                  <option value={param.method}>{param.method}</option>
-                                )}
-                                {FILL_METHODS.map(m => (
-                                  <option key={m} value={m}>{m}</option>
-                                ))}
-                              </select>
+                             <td className="px-8 py-4 border-b border-slate-100">
+                              {(param.id.endsWith('Mon') || param.id.endsWith('Cd') || ['Termination', 'DeathTableType', 'InterpolationType', 'EV_flag', 'Contrib_flag'].includes(param.id)) ? (
+                                <div className="flex items-center gap-2 text-slate-400 bg-slate-50/50 px-2 py-1 rounded border border-slate-100 w-fit">
+                                  <Database size={12} className="text-blue-500/50" />
+                                  <span className="text-xs font-bold uppercase tracking-wider">
+                                    {param.id.endsWith('Mon') ? 'Справочник месяцев' : 
+                                     param.id.endsWith('Cd') ? 'Выбор типа' : 'Системный выбор'}
+                                  </span>
+                                </div>
+                              ) : (
+                                <select 
+                                  value={data.method}
+                                  onChange={(e) => updateCalcParamData(param.id, 'method', e.target.value)}
+                                  className="text-sm text-slate-600 bg-transparent border-none focus:ring-0 cursor-pointer hover:text-blue-600 transition-colors w-full"
+                                >
+                                  {!FILL_METHODS.includes(param.method) && (
+                                    <option value={param.method}>{param.method}</option>
+                                  )}
+                                  {FILL_METHODS.map(m => (
+                                    <option key={m} value={m}>{m}</option>
+                                  ))}
+                                </select>
+                              )}
                             </td>
                             <td className="px-8 py-4 border-b border-slate-100">
-                              <input 
-                                type="text"
-                                value={data.value}
-                                placeholder="..."
-                                onChange={(e) => updateCalcParamData(param.id, 'value', e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                              />
+                              {param.id.endsWith('Mon') ? (
+                                <select 
+                                  value={data.value}
+                                  onChange={(e) => updateCalcParamData(param.id, 'value', e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                                >
+                                  <option value="">Выберите месяц...</option>
+                                  {MONTHS_LIST.map(m => (
+                                    <option key={m} value={m}>{m}</option>
+                                  ))}
+                                </select>
+                              ) : param.id.endsWith('Cd') ? (
+                                <select 
+                                  value={data.value}
+                                  onChange={(e) => updateCalcParamData(param.id, 'value', e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                                >
+                                  <option value="">Выберите...</option>
+                                  <option value="Ежемесячно">Ежемесячно</option>
+                                  <option value="Ежегодно">Ежегодно</option>
+                                </select>
+                              ) : (param.id === 'EV_flag' || param.id === 'Contrib_flag') ? (
+                                <select 
+                                  value={data.value}
+                                  onChange={(e) => updateCalcParamData(param.id, 'value', e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                                >
+                                  <option value="">Выберите...</option>
+                                  <option value="Y">Y (Да)</option>
+                                  <option value="N">N (Нет)</option>
+                                </select>
+                              ) : (
+                                <input 
+                                  type="text"
+                                  value={data.value}
+                                  placeholder="..."
+                                  onChange={(e) => updateCalcParamData(param.id, 'value', e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                />
+                              )}
                             </td>
                             <td className="px-8 py-4 border-b border-slate-100">
                               <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tighter ${
@@ -1108,7 +1213,55 @@ export default function App() {
                 </div>
 
                 {/* Table Panel */}
-                <div className="col-span-8">
+                <div className="col-span-8 space-y-4">
+                  <div className="flex items-center justify-end gap-3 mb-2">
+                    <button 
+                      onClick={() => {
+                        const headers = ['Age', 'Male', 'Female'];
+                        const csvRows = [headers.join(',')];
+                        for (let i = 0; i < mortalityParams.count; i++) {
+                          const age = mortalityParams.startAge + (i * mortalityParams.step);
+                          const val = getMortalityReduction(age);
+                          csvRows.push(`${age},${val.male},${val.female}`);
+                        }
+                        downloadCSV('mortality_reduction.csv', csvRows.join('\n'));
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
+                    >
+                      <FileDown size={14} />
+                      Экспорт CSV
+                    </button>
+                    <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer">
+                      <FileUp size={14} />
+                      Импорт CSV
+                      <input 
+                        type="file" 
+                        accept=".csv" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const content = event.target?.result as string;
+                            const rows = content.split('\n');
+                            const newOv = { ...mortalityReductionOverrides };
+                            for (let i = 1; i < rows.length; i++) {
+                              const cols = rows[i].split(',');
+                              if (cols.length >= 3) {
+                                const age = cols[0].trim();
+                                if (age) {
+                                  newOv[age] = { male: cols[1].trim(), female: cols[2].trim() };
+                                }
+                              }
+                            }
+                            setMortalityReductionOverrides(newOv);
+                          };
+                          reader.readAsText(file);
+                        }}
+                      />
+                    </label>
+                  </div>
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="px-8 py-5 border-b border-slate-100 bg-[#92D050]/10 flex items-center gap-3">
                       <div className="w-2 h-8 bg-[#92D050] rounded-full"></div>
@@ -1127,8 +1280,22 @@ export default function App() {
                           {generatedMortalityRows.map((row, idx) => (
                             <tr key={idx} className="hover:bg-slate-50 transition-colors border-b border-slate-100">
                               <td className="px-8 py-3.5 font-bold text-slate-700 border-r border-slate-100 bg-slate-50/30">{row.age}</td>
-                              <td className="px-8 py-3.5 text-slate-600 font-mono text-sm border-r border-slate-100">{row.male}</td>
-                              <td className="px-8 py-3.5 text-slate-600 font-mono text-sm">{row.female}</td>
+                              <td className="px-8 py-3.5 text-slate-600 font-mono text-sm border-r border-slate-100 p-0 text-center">
+                                <input 
+                                  type="text"
+                                  value={row.male}
+                                  onChange={(e) => setMortalityReductionOverrides(prev => ({ ...prev, [row.age]: { ...(prev[row.age] || { male: row.male, female: row.female }), male: e.target.value } }))}
+                                  className="w-full h-full bg-transparent px-8 py-3.5 text-center focus:outline-none focus:bg-blue-50 transition-colors"
+                                />
+                              </td>
+                              <td className="px-8 py-3.5 text-slate-600 font-mono text-sm p-0 text-center">
+                                <input 
+                                  type="text"
+                                  value={row.female}
+                                  onChange={(e) => setMortalityReductionOverrides(prev => ({ ...prev, [row.age]: { ...(prev[row.age] || { male: row.male, female: row.female }), female: e.target.value } }))}
+                                  className="w-full h-full bg-transparent px-8 py-3.5 text-center focus:outline-none focus:bg-blue-50 transition-colors"
+                                />
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -1263,9 +1430,86 @@ export default function App() {
                 {/* Table Panel */}
                 <div className="col-span-9">
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="px-8 py-5 border-b border-slate-100 bg-[#92D050]/10 flex items-center gap-3">
-                      <div className="w-2 h-8 bg-[#92D050] rounded-full"></div>
-                      <h3 className="font-bold text-slate-800">Ставки дисконтирования</h3>
+                    <div className="px-8 py-5 border-b border-slate-100 bg-[#92D050]/10 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-8 bg-[#92D050] rounded-full"></div>
+                        <h3 className="font-bold text-slate-800">Ставки дисконтирования</h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => {
+                            const headers = ['Period', 'indexation1', 'adminGrowth', 'indexation2', 'grossYield', 'netYield', 'yieldRate'];
+                            const totalCount = ratesParams.saveFor100Years ? 100 : ratesParams.count;
+                            const csvRows = [headers.join(',')];
+                            
+                            const loopCount = totalCount;
+                            for (let i = 0; i < loopCount; i++) {
+                              let key = "";
+                              if (ratesParams.viewMode === 'months') {
+                                const totalMonths = (ratesParams.startYear * 12) + i;
+                                const year = Math.floor(totalMonths / 12);
+                                const month = (totalMonths % 12) + 1;
+                                key = `${year}-${month}`;
+                              } else {
+                                key = (ratesParams.startYear + (i * ratesParams.step)).toString();
+                              }
+                              
+                              const r = [
+                                key,
+                                getRatesValue(key, 'indexation1', '0.0400'),
+                                getRatesValue(key, 'adminGrowth', '0.0500'),
+                                getRatesValue(key, 'indexation2', '0.0400'),
+                                getRatesValue(key, 'grossYield', '0.0700'),
+                                getRatesValue(key, 'netYield', '0.0600'),
+                                getRatesValue(key, 'yieldRate', '0.0650')
+                              ];
+                              csvRows.push(r.join(','));
+                            }
+                            downloadCSV(`discount_rates_${ratesParams.viewMode}.csv`, csvRows.join('\n'));
+                          }}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/50 hover:bg-white text-slate-700 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border border-slate-200"
+                        >
+                          <FileDown size={14} />
+                          Экспорт CSV
+                        </button>
+                        <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-sm">
+                          <FileUp size={14} />
+                          Импорт CSV
+                          <input 
+                            type="file" 
+                            accept=".csv" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                const content = event.target?.result as string;
+                                const rows = content.split('\n');
+                                const newData = { ...ratesData };
+                                for (let i = 1; i < rows.length; i++) {
+                                  const cols = rows[i].split(',');
+                                  if (cols.length >= 7) {
+                                    const key = cols[0].trim();
+                                    if (key) {
+                                      newData[key] = {
+                                        indexation1: cols[1].trim(),
+                                        adminGrowth: cols[2].trim(),
+                                        indexation2: cols[3].trim(),
+                                        grossYield: cols[4].trim(),
+                                        netYield: cols[5].trim(),
+                                        yieldRate: cols[6].trim()
+                                      };
+                                    }
+                                  }
+                                }
+                                setRatesData(newData);
+                              };
+                              reader.readAsText(file);
+                            }}
+                          />
+                        </label>
+                      </div>
                     </div>
                     <div className="overflow-x-auto">
                       <div className="max-h-[600px] overflow-y-auto">
@@ -1496,7 +1740,71 @@ export default function App() {
                 </div>
 
                 {/* Table Area */}
-                <div className="col-span-8">
+                <div className="col-span-8 space-y-4">
+                  <div className="flex items-center justify-end gap-3 mb-2">
+                    <button 
+                      onClick={() => {
+                        const headers = ['Year', 'UK_Const', 'UK_Var', 'ASV', 'SD', 'VF_Const', 'VF_Var'];
+                        const csvRows = [headers.join(',')];
+                        
+                        for (let i = 0; i < expenseParams.count; i++) {
+                          const year = expenseParams.startYear + (i * expenseParams.step);
+                          const ov = expenseOverrides[year.toString()] || {};
+                          csvRows.push([
+                            year,
+                            ov.uk_const || '0.15%',
+                            ov.uk_var || '10.0%',
+                            ov.asv || '0.05%',
+                            ov.sd || '0.10%',
+                            ov.vf_const || '0.20%',
+                            ov.vf_var || '5.0%'
+                          ].join(','));
+                        }
+                        downloadCSV('npo_expenses.csv', csvRows.join('\n'));
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
+                    >
+                      <FileDown size={14} />
+                      Экспорт CSV
+                    </button>
+                    <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer">
+                      <FileUp size={14} />
+                      Импорт CSV
+                      <input 
+                        type="file" 
+                        accept=".csv" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const content = event.target?.result as string;
+                            const rows = content.split('\n');
+                            const newOv = { ...expenseOverrides };
+                            for (let i = 1; i < rows.length; i++) {
+                              const cols = rows[i].split(',');
+                              if (cols.length >= 7) {
+                                const year = cols[0].trim();
+                                if (year) {
+                                  newOv[year] = {
+                                    uk_const: cols[1].trim(),
+                                    uk_var: cols[2].trim(),
+                                    asv: cols[3].trim(),
+                                    sd: cols[4].trim(),
+                                    vf_const: cols[5].trim(),
+                                    vf_var: cols[6].trim()
+                                  };
+                                }
+                              }
+                            }
+                            setExpenseOverrides(newOv);
+                          };
+                          reader.readAsText(file);
+                        }}
+                      />
+                    </label>
+                  </div>
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse">
@@ -1517,18 +1825,61 @@ export default function App() {
                         <tbody className="divide-y divide-slate-100">
                           {Array.from({ length: expenseParams.count }).map((_, idx) => {
                             const year = expenseParams.startYear + (idx * expenseParams.step);
+                            const ov = expenseOverrides[year.toString()] || {};
                             return (
                               <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                 <td className="px-6 py-3.5 font-bold text-slate-700 border-r border-slate-100 bg-slate-50/30">{year}</td>
                                 {expenseOptionalCols.portfolio && (
                                   <td className="px-6 py-3.5 text-slate-600 font-medium border-r border-slate-100">Основной</td>
                                 )}
-                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm border-r border-slate-100">0.15%</td>
-                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm border-r border-slate-100">10.0%</td>
-                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm border-r border-slate-100">0.05%</td>
-                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm border-r border-slate-100">0.10%</td>
-                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm border-r border-slate-100">0.20%</td>
-                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm">5.0%</td>
+                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm border-r border-slate-100 p-0">
+                                  <input 
+                                    type="text"
+                                    value={ov.uk_const || '0.15%'}
+                                    onChange={(e) => setExpenseOverrides(prev => ({ ...prev, [year]: { ...(prev[year] || {}), uk_const: e.target.value } }))}
+                                    className="w-full h-full bg-transparent px-6 py-3.5 focus:outline-none focus:bg-blue-50 transition-colors"
+                                  />
+                                </td>
+                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm border-r border-slate-100 p-0">
+                                  <input 
+                                    type="text"
+                                    value={ov.uk_var || '10.0%'}
+                                    onChange={(e) => setExpenseOverrides(prev => ({ ...prev, [year]: { ...(prev[year] || {}), uk_var: e.target.value } }))}
+                                    className="w-full h-full bg-transparent px-6 py-3.5 focus:outline-none focus:bg-blue-50 transition-colors"
+                                  />
+                                </td>
+                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm border-r border-slate-100 p-0">
+                                  <input 
+                                    type="text"
+                                    value={ov.asv || '0.05%'}
+                                    onChange={(e) => setExpenseOverrides(prev => ({ ...prev, [year]: { ...(prev[year] || {}), asv: e.target.value } }))}
+                                    className="w-full h-full bg-transparent px-6 py-3.5 focus:outline-none focus:bg-blue-50 transition-colors"
+                                  />
+                                </td>
+                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm border-r border-slate-100 p-0">
+                                  <input 
+                                    type="text"
+                                    value={ov.sd || '0.10%'}
+                                    onChange={(e) => setExpenseOverrides(prev => ({ ...prev, [year]: { ...(prev[year] || {}), sd: e.target.value } }))}
+                                    className="w-full h-full bg-transparent px-6 py-3.5 focus:outline-none focus:bg-blue-50 transition-colors"
+                                  />
+                                </td>
+                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm border-r border-slate-100 p-0">
+                                  <input 
+                                    type="text"
+                                    value={ov.vf_const || '0.20%'}
+                                    onChange={(e) => setExpenseOverrides(prev => ({ ...prev, [year]: { ...(prev[year] || {}), vf_const: e.target.value } }))}
+                                    className="w-full h-full bg-transparent px-6 py-3.5 focus:outline-none focus:bg-blue-50 transition-colors"
+                                  />
+                                </td>
+                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm p-0">
+                                  <input 
+                                    type="text"
+                                    value={ov.vf_var || '5.0%'}
+                                    onChange={(e) => setExpenseOverrides(prev => ({ ...prev, [year]: { ...(prev[year] || {}), vf_var: e.target.value } }))}
+                                    className="w-full h-full bg-transparent px-6 py-3.5 focus:outline-none focus:bg-blue-50 transition-colors"
+                                  />
+                                </td>
                               </tr>
                             );
                           })}
@@ -1589,7 +1940,55 @@ export default function App() {
                 </div>
 
                 {/* Table Area */}
-                <div className="col-span-8">
+                <div className="col-span-8 space-y-4">
+                  <div className="flex items-center justify-end gap-3 mb-2">
+                    <button 
+                      onClick={() => {
+                        const headers = ['Term', 'Probability'];
+                        const csvRows = [headers.join(',')];
+                        
+                        for (let i = 0; i < terminationParams.count; i++) {
+                          const term = terminationParams.startTerm + (i * terminationParams.step);
+                          csvRows.push(`${term},${getTerminationProb(term)}`);
+                        }
+                        downloadCSV('termination_probability.csv', csvRows.join('\n'));
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
+                    >
+                      <FileDown size={14} />
+                      Экспорт CSV
+                    </button>
+                    <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer">
+                      <FileUp size={14} />
+                      Импорт CSV
+                      <input 
+                        type="file" 
+                        accept=".csv" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const content = event.target?.result as string;
+                            const rows = content.split('\n');
+                            const newOv = { ...terminationOverrides };
+                            for (let i = 1; i < rows.length; i++) {
+                              const cols = rows[i].split(',');
+                              if (cols.length >= 2) {
+                                const term = cols[0].trim();
+                                if (term) {
+                                  newOv[term] = cols[1].trim();
+                                }
+                              }
+                            }
+                            setTerminationOverrides(newOv);
+                          };
+                          reader.readAsText(file);
+                        }}
+                      />
+                    </label>
+                  </div>
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse">
@@ -1606,12 +2005,18 @@ export default function App() {
                         <tbody className="divide-y divide-slate-100">
                           {Array.from({ length: terminationParams.count }).map((_, idx) => {
                             const term = terminationParams.startTerm + (idx * terminationParams.step);
-                            // Mock probability decreasing with term
-                            const prob = Math.max(0.01, 0.15 - (term * 0.005)).toFixed(4);
+                            const prob = getTerminationProb(term);
                             return (
                               <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                 <td className="px-6 py-3.5 font-bold text-slate-700 border-r border-slate-100 bg-slate-50/30 text-center">{term}</td>
-                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm text-center">{(parseFloat(prob) * 100).toFixed(2)}%</td>
+                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm text-center p-0">
+                                  <input 
+                                    type="text"
+                                    value={prob}
+                                    onChange={(e) => setTerminationOverrides(prev => ({ ...prev, [term]: e.target.value }))}
+                                    className="w-full h-full bg-transparent px-6 py-3.5 text-center focus:outline-none focus:bg-blue-50 transition-colors"
+                                  />
+                                </td>
                               </tr>
                             );
                           })}
@@ -1668,17 +2073,6 @@ export default function App() {
 
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">
-                          Первый {mortalityTableParams.viewMode === 'years' ? 'год' : 'период'}
-                        </label>
-                        <input 
-                          type="number" 
-                          value={mortalityTableParams.startYear}
-                          onChange={(e) => setMortalityTableParams(p => ({ ...p, startYear: parseInt(e.target.value) || 2024 }))}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">
                           Первый возраст
                         </label>
                         <input 
@@ -1731,7 +2125,73 @@ export default function App() {
                 </div>
 
                 {/* Table Area */}
-                <div className="col-span-9">
+                <div className="col-span-9 space-y-4">
+                  <div className="flex items-center justify-end gap-3 mb-2">
+                    <button 
+                      onClick={() => {
+                        const headers = ['AgeKey', 'Male', 'Female'];
+                        const totalCount = mortalityTableParams.count;
+                        const csvRows = [headers.join(',')];
+                        
+                        if (mortalityTableParams.viewMode === 'months') {
+                          for (let i = 0; i < totalCount; i++) {
+                            const totalAgeMonths = (mortalityTableParams.startAge * 12) + i;
+                            const ageYears = Math.floor(totalAgeMonths / 12);
+                            const ageMonths = totalAgeMonths % 12;
+                            const key = `${ageYears}-${ageMonths}`;
+                            const valMale = getLxValue(ageYears, ageMonths, 'Муж');
+                            const valFemale = getLxValue(ageYears, ageMonths, 'Жен');
+                            csvRows.push(`${key},${valMale},${valFemale}`);
+                          }
+                        } else {
+                          for (let i = 0; i < totalCount; i++) {
+                            const age = mortalityTableParams.startAge + (i * mortalityTableParams.step);
+                            const valMale = getLxValue(age, 0, 'Муж');
+                            const valFemale = getLxValue(age, 0, 'Жен');
+                            csvRows.push(`${age},${valMale},${valFemale}`);
+                          }
+                        }
+                        downloadCSV(`mortality_${mortalityTableParams.viewMode}.csv`, csvRows.join('\n'));
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
+                    >
+                      <FileDown size={14} />
+                      Экспорт CSV
+                    </button>
+                    <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer">
+                      <FileUp size={14} />
+                      Импорт CSV
+                      <input 
+                        type="file" 
+                        accept=".csv" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const content = event.target?.result as string;
+                            const rows = content.split('\n');
+                            const newOverrides = { ...mortalityManualLx };
+                            for (let i = 1; i < rows.length; i++) {
+                              const cols = rows[i].split(',');
+                              if (cols.length >= 3) {
+                                const key = cols[0].trim();
+                                if (key) {
+                                  newOverrides[key] = {
+                                    male: cols[1].trim() || undefined,
+                                    female: cols[2].trim() || undefined
+                                  };
+                                }
+                              }
+                            }
+                            setMortalityManualLx(newOverrides);
+                          };
+                          reader.readAsText(file);
+                        }}
+                      />
+                    </label>
+                  </div>
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse">
@@ -1908,7 +2368,58 @@ export default function App() {
                 </div>
 
                 {/* Table Area */}
-                <div className="col-span-9">
+                <div className="col-span-9 space-y-4">
+                  <div className="flex items-center justify-end gap-3 mb-2">
+                    <button 
+                      onClick={() => {
+                        const headers = ['Age', 'Probability'];
+                        const totalCount = retirementParams.count;
+                        const csvRows = [headers.join(',')];
+                        const data = retirementParams.type === 'accumulative' ? retirementProbsAccum : retirementProbsNonAccum;
+                        
+                        for (let i = 0; i < totalCount; i++) {
+                          const age = retirementParams.startAge + (i * retirementParams.step);
+                          csvRows.push(`${age},${data[age.toString()] || '0.0000'}`);
+                        }
+                        downloadCSV(`retirement_${retirementParams.type}.csv`, csvRows.join('\n'));
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
+                    >
+                      <FileDown size={14} />
+                      Экспорт CSV
+                    </button>
+                    <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer">
+                      <FileUp size={14} />
+                      Импорт CSV
+                      <input 
+                        type="file" 
+                        accept=".csv" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const content = event.target?.result as string;
+                            const rows = content.split('\n');
+                            const newData = { ...(retirementParams.type === 'accumulative' ? retirementProbsAccum : retirementProbsNonAccum) };
+                            for (let i = 1; i < rows.length; i++) {
+                              const cols = rows[i].split(',');
+                              if (cols.length >= 2) {
+                                const age = cols[0].trim();
+                                if (age) {
+                                  newData[age] = cols[1].trim();
+                                }
+                              }
+                            }
+                            if (retirementParams.type === 'accumulative') setRetirementProbsAccum(newData);
+                            else setRetirementProbsNonAccum(newData);
+                          };
+                          reader.readAsText(file);
+                        }}
+                      />
+                    </label>
+                  </div>
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse">
@@ -2003,7 +2514,56 @@ export default function App() {
                 </div>
 
                 {/* Table Area */}
-                <div className="col-span-9">
+                <div className="col-span-9 space-y-4">
+                  <div className="flex items-center justify-end gap-3 mb-2">
+                    <button 
+                      onClick={() => {
+                        const headers = ['SchemeCode', 'Age', 'Male', 'Female'];
+                        const csvRows = [headers.join(',')];
+                        const age = lifeTariffParams.age;
+                        schemeCodes.slice(0, lifeTariffParams.count).forEach(code => {
+                          const val = getLifeTariffVal(code, age);
+                          csvRows.push(`${code},${age},${val.male},${val.female}`);
+                        });
+                        downloadCSV(`life_tariffs_age_${age}.csv`, csvRows.join('\n'));
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
+                    >
+                      <FileDown size={14} />
+                      Экспорт CSV
+                    </button>
+                    <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer">
+                      <FileUp size={14} />
+                      Импорт CSV
+                      <input 
+                        type="file" 
+                        accept=".csv" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const content = event.target?.result as string;
+                            const rows = content.split('\n');
+                            const newOv = { ...lifeTariffOverrides };
+                            for (let i = 1; i < rows.length; i++) {
+                              const cols = rows[i].split(',');
+                              if (cols.length >= 4) {
+                                const code = cols[0].trim();
+                                const ageAttr = cols[1].trim();
+                                if (code && ageAttr) {
+                                  newOv[`${code}-${ageAttr}`] = { male: cols[2].trim(), female: cols[3].trim() };
+                                }
+                              }
+                            }
+                            setLifeTariffOverrides(newOv);
+                          };
+                          reader.readAsText(file);
+                        }}
+                      />
+                    </label>
+                  </div>
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse">
@@ -2018,16 +2578,30 @@ export default function App() {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {schemeCodes.slice(0, lifeTariffParams.count).map((code, idx) => {
-                            const maleTariff = (12.5 + Math.random() * 2).toFixed(4);
-                            const femaleTariff = (14.2 + Math.random() * 2).toFixed(4);
+                            const age = lifeTariffParams.age;
+                            const val = getLifeTariffVal(code, age);
                             
                             return (
                               <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                 <td className="px-6 py-3.5 font-bold text-slate-700 border-r border-slate-100 bg-slate-50/30 text-center">{code}</td>
                                 <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center">-</td>
-                                <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center">{lifeTariffParams.age}</td>
-                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm border-r border-slate-100 text-center">{maleTariff}</td>
-                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm text-center">{femaleTariff}</td>
+                                <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center">{age}</td>
+                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm border-r border-slate-100 text-center p-0">
+                                  <input 
+                                    type="text"
+                                    value={val.male}
+                                    onChange={(e) => setLifeTariffOverrides(prev => ({ ...prev, [`${code}-${age}`]: { ...(prev[`${code}-${age}`] || val), male: e.target.value } }))}
+                                    className="w-full h-full bg-transparent px-6 py-3.5 text-center focus:outline-none focus:bg-blue-50 transition-colors"
+                                  />
+                                </td>
+                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm text-center p-0">
+                                  <input 
+                                    type="text"
+                                    value={val.female}
+                                    onChange={(e) => setLifeTariffOverrides(prev => ({ ...prev, [`${code}-${age}`]: { ...(prev[`${code}-${age}`] || val), female: e.target.value } }))}
+                                    className="w-full h-full bg-transparent px-6 py-3.5 text-center focus:outline-none focus:bg-blue-50 transition-colors"
+                                  />
+                                </td>
                               </tr>
                             );
                           })}
@@ -2089,7 +2663,58 @@ export default function App() {
                 </div>
 
                 {/* Table Area */}
-                <div className="col-span-9">
+                <div className="col-span-9 space-y-4">
+                  <div className="flex items-center justify-end gap-3 mb-2">
+                    <button 
+                      onClick={() => {
+                        const headers = ['SchemeCode', 'Age', 'Term', 'Male', 'Female'];
+                        const csvRows = [headers.join(',')];
+                        const age = termTariffParams.age;
+                        const term = termTariffParams.term;
+                        schemeCodes.slice(0, termTariffParams.count).forEach(code => {
+                          const val = getTermTariffVal(code, age, term);
+                          csvRows.push(`${code},${age},${term},${val.male},${val.female}`);
+                        });
+                        downloadCSV(`term_tariffs_age_${age}_term_${term}.csv`, csvRows.join('\n'));
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
+                    >
+                      <FileDown size={14} />
+                      Экспорт CSV
+                    </button>
+                    <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer">
+                      <FileUp size={14} />
+                      Импорт CSV
+                      <input 
+                        type="file" 
+                        accept=".csv" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const content = event.target?.result as string;
+                            const rows = content.split('\n');
+                            const newOv = { ...termTariffOverrides };
+                            for (let i = 1; i < rows.length; i++) {
+                              const cols = rows[i].split(',');
+                              if (cols.length >= 5) {
+                                const code = cols[0].trim();
+                                const ageAttr = cols[1].trim();
+                                const termAttr = cols[2].trim();
+                                if (code && ageAttr && termAttr) {
+                                  newOv[`${code}-${ageAttr}-${termAttr}`] = { male: cols[3].trim(), female: cols[4].trim() };
+                                }
+                              }
+                            }
+                            setTermTariffOverrides(newOv);
+                          };
+                          reader.readAsText(file);
+                        }}
+                      />
+                    </label>
+                  </div>
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse">
@@ -2099,20 +2724,38 @@ export default function App() {
                             <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider bg-yellow-400 border-r border-slate-200 text-center">Пол</th>
                             <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider bg-lime-400 border-r border-slate-200 text-center">Возраст участника</th>
                             <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider bg-lime-400 border-r border-slate-200 text-center">Срок выплаты пенсии</th>
-                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider bg-lime-400 text-center">Тариф</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider bg-lime-400 border-r border-slate-200 text-center">Тариф для мужчин</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider bg-lime-400 text-center">Тариф для женщин</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {schemeCodes.slice(0, termTariffParams.count).map((code, idx) => {
-                            const tariff = (8.5 + Math.random() * 1.5).toFixed(4);
+                            const age = termTariffParams.age;
+                            const term = termTariffParams.term;
+                            const val = getTermTariffVal(code, age, term);
                             
                             return (
                               <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                 <td className="px-6 py-3.5 font-bold text-slate-700 border-r border-slate-100 bg-slate-50/30 text-center">{code}</td>
                                 <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center">-</td>
-                                <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center">{termTariffParams.age}</td>
-                                <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center">{termTariffParams.term}</td>
-                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm text-center">{tariff}</td>
+                                <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center">{age}</td>
+                                <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center">{term}</td>
+                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm border-r border-slate-100 text-center p-0">
+                                  <input 
+                                    type="text"
+                                    value={val.male}
+                                    onChange={(e) => setTermTariffOverrides(prev => ({ ...prev, [`${code}-${age}-${term}`]: { ...(prev[`${code}-${age}-${term}`] || val), male: e.target.value } }))}
+                                    className="w-full h-full bg-transparent px-6 py-3.5 text-center focus:outline-none focus:bg-blue-50 transition-colors"
+                                  />
+                                </td>
+                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm text-center p-0">
+                                  <input 
+                                    type="text"
+                                    value={val.female}
+                                    onChange={(e) => setTermTariffOverrides(prev => ({ ...prev, [`${code}-${age}-${term}`]: { ...(prev[`${code}-${age}-${term}`] || val), female: e.target.value } }))}
+                                    className="w-full h-full bg-transparent px-6 py-3.5 text-center focus:outline-none focus:bg-blue-50 transition-colors"
+                                  />
+                                </td>
                               </tr>
                             );
                           })}
