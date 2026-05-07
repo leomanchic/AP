@@ -241,19 +241,19 @@ const ASSUMPTIONS: Record<ProductType, ProductAssumptions> = {
       { label: 'Параметры расчета', value: 'Параметры расчета ПДС общий', description: 'Общие вводные для новой программы сбережений.', hasDetails: true },
       { label: 'Параметры по продуктам', value: 'Параметры по продуктам ПДС', description: 'Специфические настройки для различных веток ПДС.', hasDetails: true },
       { label: 'Параметры по продуктам и каналам', value: 'Параметры по продуктам и каналам', description: 'Специфические настройки в разрезе продуктов и каналов продаж.' },
-      { label: 'Параметры по стратегиям', value: 'Параметры по стратегиям', description: 'Инвестиционные и расчетные параметры для различных стратегий размещения.' },
-      { label: 'Паттерны LIC', value: 'Паттерны LIC', description: '(Паттерны распределения доплат ЛВ, ДСВ, ЕВ_ОПС по месяцам)' },
-      { label: 'Периодичность выплат', value: 'Периодичность выплат', description: '(Справочник: ежемесячно, ежеквартально, ежегодно)' },
+      { label: 'Параметры по стратегиям', value: 'Параметры по стратегиям', description: 'Инвестиционные и расчетные параметры для различных стратегий размещения.', hasDetails: true },
+      { label: 'Паттерны LIC', value: 'Паттерны LIC', description: '(Паттерны распределения доплат ЛВ, ДСВ, ЕВ_ОПС по месяцам)', hasDetails: true },
+      { label: 'Периодичность выплат', value: 'Периодичность выплат', description: '(Справочник: ежемесячно, ежеквартально, ежегодно)', hasDetails: true },
       { label: 'Экономические предпосылки', isHeader: true },
-      { label: 'Тарифы', value: 'Тарифы', description: 'Актуарные тарифы для расчета обязательств по ПДС.' },
+      { label: 'Тарифы', value: 'Тарифы', description: 'Актуарные тарифы для расчета обязательств по ПДС.', hasDetails: true },
       { label: 'Расходы и комиссии', isHeader: true },
       { label: 'Расходы', value: 'Расходы', description: '(ВГО расходы/доходы, прямые и косвенные расходы в % от СЧА и фиксированных суммах)' },
       { label: 'Расходы УК, СД, АСВ', value: 'Процент расходов ПДС', description: '(Вознаграждения управляющей компании, спецдепозитария, взносы в АСВ и НРД по годам)', hasDetails: true },
       { label: 'Поведенческие декременты', isHeader: true },
       { label: 'Вероятность расторжения', value: 'Вероятность расторжения', description: '(Зависимость от пола и срока действия договора)', hasDetails: true },
-      { label: 'Вероятность ОЖС', value: 'Вероятность ОЖС', description: '(Особые жизненные ситуации — снятие средств при тяжелых болезнях/потере кормильца)' },
-      { label: 'Вероятность перевода из ОПС', value: 'Вероятность перевода из ОПС', description: '(Вероятность перевода средств обязательного пенсионного страхования в ПДС)' },
-      { label: 'Вероятности перевода в др. НПФ', value: 'Вероятности перевода в др. НПФ', description: '(Риск оттока в другие фонды)' },
+      { label: 'Вероятность ОЖС', value: 'Вероятность ОЖС', description: '(Особые жизненные ситуации — снятие средств при тяжелых болезнях/потере кормильца)', hasDetails: true },
+      { label: 'Вероятность перевода из ОПС', value: 'Вероятность перевода из ОПС', description: '(Вероятность перевода средств обязательного пенсионного страхования в ПДС)', hasDetails: true },
+      { label: 'Вероятности перевода в др. НПФ', value: 'Вероятности перевода в др. НПФ', description: '(Риск оттока в другие фонды)', hasDetails: true },
       { label: 'Демографические параметры', isHeader: true },
       { label: 'Таблица смертности', value: 'Таблица смертности', description: 'Базовая демография для ПДС.', hasDetails: true },
       { label: 'Таблицы дожитий ООН', value: 'Таблицы дожитий ООН', description: '(Прогнозные таблицы ООН по годам и возрастам)' },
@@ -905,6 +905,158 @@ export default function App() {
       ...prev,
       [`${age}-${gender}`]: value
     }));
+  };
+
+  // Patterns for LIC Table
+  const [licPatterns, setLicPatterns] = useState<{type: string, month: string, value: string}[]>([
+    { type: 'ЛВ', month: '1', value: '60%' },
+    { type: 'ЛВ', month: '12', value: '10%' },
+    { type: 'ЛВ', month: '24', value: '30%' },
+    { type: 'ДСВ', month: '1', value: '60%' },
+    { type: 'ДСВ', month: '12', value: '10%' },
+    { type: 'ДСВ', month: '24', value: '30%' },
+    { type: 'ЕВ_ОПС', month: '1', value: '60%' },
+    { type: 'ЕВ_ОПС', month: '12', value: '10%' },
+    { type: 'ЕВ_ОПС', month: '24', value: '30%' }
+  ]);
+
+  const updateLicPattern = (index: number, field: 'month' | 'value' | 'type', newVal: string) => {
+    setLicPatterns(prev => prev.map((item, i) => 
+      i === index ? { ...item, [field]: newVal } : item
+    ));
+  };
+
+  // Strategy Parameters
+  const [strategyParams, setStrategyParams] = useState<{strategy: string, parameter: string, value: string}[]>([
+    { strategy: 'ПДС1', parameter: 'Размер ИД с начала года', value: '20636998952' },
+    { strategy: 'ПДС2', parameter: 'Размер ИД с начала года', value: '20636998952' }
+  ]);
+
+  const updateStrategyParam = (index: number, field: keyof typeof strategyParams[0], newVal: string) => {
+    setStrategyParams(prev => prev.map((item, i) => 
+      i === index ? { ...item, [field]: newVal } : item
+    ));
+  };
+
+  // Payment Frequency
+  const [paymentFreqParams, setPaymentFreqParams] = useState<{periodicity: string, freq: string, numFreq: string}[]>([
+    { periodicity: 'Ежемесячно', freq: '12', numFreq: '1' },
+    { periodicity: 'Ежеквартально', freq: '4', numFreq: '3' },
+    { periodicity: 'Ежегодно', freq: '1', numFreq: '12' }
+  ]);
+
+  const updatePaymentFreqParam = (index: number, field: keyof typeof paymentFreqParams[0], newVal: string) => {
+    setPaymentFreqParams(prev => prev.map((item, i) => 
+      i === index ? { ...item, [field]: newVal } : item
+    ));
+  };
+
+  // Ozhs Probability Table
+  const [ozhsParams, setOzhsParams] = useState({
+    startAge: 18,
+    count: 20,
+    gender: 'M' as 'M' | 'W'
+  });
+
+  const [ozhsOverrides, setOzhsOverrides] = useState<Record<string, string>>({});
+
+  const updateOzhsOverride = (age: number, gender: string, value: string) => {
+    setOzhsOverrides(prev => ({
+      ...prev,
+      [`${age}-${gender}`]: value
+    }));
+  };
+
+  const fillDownOzhs = (startAge: number, value: string) => {
+    setOzhsOverrides(prev => {
+      const next = { ...prev };
+      const currentGender = ozhsParams.gender;
+      for (let age = startAge; age < ozhsParams.startAge + ozhsParams.count; age++) {
+        next[`${age}-${currentGender}`] = value;
+      }
+      return next;
+    });
+  };
+
+  // OPS Transfer Probability Table
+  const [opsTransferParams, setOpsTransferParams] = useState({
+    startAge: 18,
+    count: 20,
+    gender: 'M' as 'M' | 'W'
+  });
+
+  const [opsTransferOverrides, setOpsTransferOverrides] = useState<Record<string, string>>({});
+
+  const updateOpsTransferOverride = (age: number, gender: string, value: string) => {
+    setOpsTransferOverrides(prev => ({
+      ...prev,
+      [`${age}-${gender}`]: value
+    }));
+  };
+
+  const fillDownOpsTransfer = (startAge: number, value: string) => {
+    setOpsTransferOverrides(prev => {
+      const next = { ...prev };
+      const currentGender = opsTransferParams.gender;
+      for (let age = startAge; age < opsTransferParams.startAge + opsTransferParams.count; age++) {
+        next[`${age}-${currentGender}`] = value;
+      }
+      return next;
+    });
+  };
+
+  // NPF Transfer Probability Table
+  const [npfTransferParams, setNpfTransferParams] = useState({
+    startAge: 18,
+    count: 20,
+    gender: 'M' as 'M' | 'W'
+  });
+
+  const [npfTransferOverrides, setNpfTransferOverrides] = useState<Record<string, string>>({});
+
+  const updateNpfTransferOverride = (age: number, gender: string, value: string) => {
+    setNpfTransferOverrides(prev => ({
+      ...prev,
+      [`${age}-${gender}`]: value
+    }));
+  };
+
+  const fillDownNpfTransfer = (startAge: number, value: string) => {
+    setNpfTransferOverrides(prev => {
+      const next = { ...prev };
+      const currentGender = npfTransferParams.gender;
+      for (let age = startAge; age < npfTransferParams.startAge + npfTransferParams.count; age++) {
+        next[`${age}-${currentGender}`] = value;
+      }
+      return next;
+    });
+  };
+
+  // Life Pension Tariff Parameters
+  const [lifePensionTariffParams, setLifePensionTariffParams] = useState({
+    startAge: 45,
+    count: 20,
+    gender: 'M' as 'M' | 'W'
+  });
+
+  const [lifePensionTariffOverrides, setLifePensionTariffOverrides] = useState<Record<string, string>>({});
+
+  const updateLifePensionTariffOverride = (age: number, gender: string, value: string) => {
+    setLifePensionTariffOverrides(prev => ({
+      ...prev,
+      [`${age}-${gender}`]: value
+    }));
+  };
+
+  const fillDownLifePensionTariff = (startAge: number, value: string) => {
+    setLifePensionTariffOverrides(prev => {
+      const next = { ...prev };
+      const currentGender = lifePensionTariffParams.gender;
+      for (let age = startAge; age < lifePensionTariffParams.startAge + lifePensionTariffParams.count; age++) {
+        next[`${age}-${currentGender}`] = value;
+      }
+      return next;
+    });
   };
 
   // Parameters for Life Tariffs
@@ -3190,6 +3342,709 @@ export default function App() {
                               </tr>
                             );
                           })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : showDetails === 'Вероятность ОЖС' ? (
+            <motion.div
+              key="details-ozhs-prob"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="grid grid-cols-12 gap-8">
+                {/* Parameterization Panel */}
+                <div className="col-span-4 space-y-6">
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <div className="flex items-center gap-2 mb-6 text-blue-600">
+                      <Settings size={18} />
+                      <h4 className="font-bold uppercase text-xs tracking-widest">Параметризация</h4>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-3 ml-1">Пол</label>
+                        <div className="flex p-1 bg-slate-100 rounded-xl">
+                          <button 
+                            onClick={() => setOzhsParams(p => ({ ...p, gender: 'M' }))}
+                            className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                              ozhsParams.gender === 'M' 
+                                ? 'bg-white text-blue-600 shadow-sm' 
+                                : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                          >
+                            Мужчины
+                          </button>
+                          <button 
+                            onClick={() => setOzhsParams(p => ({ ...p, gender: 'W' }))}
+                            className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                              ozhsParams.gender === 'W' 
+                                ? 'bg-white text-blue-600 shadow-sm' 
+                                : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                          >
+                            Женщины
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Начальный возраст</label>
+                        <input 
+                          type="number" 
+                          value={ozhsParams.startAge}
+                          onChange={(e) => setOzhsParams(p => ({ ...p, startAge: parseInt(e.target.value) || 0 }))}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Количество строк</label>
+                        <input 
+                          type="number" 
+                          value={ozhsParams.count}
+                          onChange={(e) => setOzhsParams(p => ({ ...p, count: Math.min(100, parseInt(e.target.value) || 1) }))}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-600 rounded-2xl p-6 text-white shadow-lg shadow-blue-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Info size={16} />
+                      <span className="text-xs font-bold uppercase tracking-wider">Описание</span>
+                    </div>
+                    <p className="text-sm leading-relaxed opacity-90">
+                      Вероятность наступления особых жизненных ситуаций (тяжелые болезни, потеря кормильца), дающих право на досрочное снятие средств без потери дохода.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Table Area */}
+                <div className="col-span-8 space-y-4">
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50">
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-r border-slate-200 text-center">Возраст</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-r border-slate-200 text-center">Пол</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider text-center">Вероятность</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {Array.from({ length: ozhsParams.count }).map((_, i) => {
+                            const age = ozhsParams.startAge + i;
+                            const key = `${age}-${ozhsParams.gender}`;
+                            return (
+                              <tr key={key} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-6 py-3.5 font-bold text-slate-700 border-r border-slate-100 bg-slate-50/30 text-center">{age}</td>
+                                <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center">
+                                  {ozhsParams.gender === 'M' ? 'Мужской' : 'Женский'}
+                                </td>
+                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm text-center p-0 relative group/cell">
+                                  <input 
+                                    type="text"
+                                    value={ozhsOverrides[key] || '0.01%'}
+                                    onChange={(e) => updateOzhsOverride(age, ozhsParams.gender, e.target.value)}
+                                    className="w-full h-full bg-transparent px-6 py-3.5 text-center focus:outline-none focus:bg-blue-50 transition-colors"
+                                  />
+                                  <button 
+                                    onClick={() => fillDownOzhs(age, ozhsOverrides[key] || '0.01%')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/cell:opacity-100 p-1.5 hover:bg-blue-100 rounded-lg text-blue-500 transition-all shadow-sm bg-white"
+                                    title="Заполнить вниз"
+                                  >
+                                    <ChevronDown size={14} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : showDetails === 'Тарифы' ? (
+            <motion.div
+              key="details-tariffs"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="grid grid-cols-12 gap-8">
+                {/* Parameterization Panel */}
+                <div className="col-span-4 space-y-6">
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <div className="flex items-center gap-2 mb-6 text-blue-600">
+                      <Settings size={18} />
+                      <h4 className="font-bold uppercase text-xs tracking-widest">Параметризация</h4>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-3 ml-1">Пол</label>
+                        <div className="flex p-1 bg-slate-100 rounded-xl">
+                          <button 
+                            onClick={() => setLifePensionTariffParams(p => ({ ...p, gender: 'M' }))}
+                            className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                              lifePensionTariffParams.gender === 'M' 
+                                ? 'bg-white text-blue-600 shadow-sm' 
+                                : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                          >
+                            Мужчины
+                          </button>
+                          <button 
+                            onClick={() => setLifePensionTariffParams(p => ({ ...p, gender: 'W' }))}
+                            className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                              lifePensionTariffParams.gender === 'W' 
+                                ? 'bg-white text-blue-600 shadow-sm' 
+                                : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                          >
+                            Женщины
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Начальный возраст</label>
+                        <input 
+                          type="number" 
+                          value={lifePensionTariffParams.startAge}
+                          onChange={(e) => setLifePensionTariffParams(p => ({ ...p, startAge: parseInt(e.target.value) || 0 }))}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Количество строк</label>
+                        <input 
+                          type="number" 
+                          value={lifePensionTariffParams.count}
+                          onChange={(e) => setLifePensionTariffParams(p => ({ ...p, count: Math.min(100, parseInt(e.target.value) || 1) }))}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-amber-600 rounded-2xl p-6 text-white shadow-lg shadow-amber-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Info size={16} />
+                      <span className="text-xs font-bold uppercase tracking-wider">Описание</span>
+                    </div>
+                    <p className="text-sm leading-relaxed opacity-90">
+                      Актуарные тарифы пожизненной пенсии. Используются для расчета текущей стоимости будущих пенсионных выплат с учетом вероятностей дожития.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Table Area */}
+                <div className="col-span-8 space-y-4">
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50">
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-r border-slate-200 text-center">Возраст</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-r border-slate-200 text-center">Пол</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider text-center">Тариф пожизненной пенсии</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {Array.from({ length: lifePensionTariffParams.count }).map((_, i) => {
+                            const age = lifePensionTariffParams.startAge + i;
+                            const key = `${age}-${lifePensionTariffParams.gender}`;
+                            return (
+                              <tr key={key} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-6 py-3.5 font-bold text-slate-700 border-r border-slate-100 bg-slate-50/30 text-center">{age}</td>
+                                <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center">
+                                  {lifePensionTariffParams.gender === 'M' ? 'Мужской' : 'Женский'}
+                                </td>
+                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm text-center p-0 relative group/cell">
+                                  <input 
+                                    type="text" 
+                                    value={lifePensionTariffOverrides[key] || '0.000'}
+                                    onChange={(e) => updateLifePensionTariffOverride(age, lifePensionTariffParams.gender, e.target.value)}
+                                    className="w-full h-full bg-transparent px-6 py-3.5 text-center focus:outline-none focus:bg-blue-50 transition-colors"
+                                  />
+                                  <button 
+                                    onClick={() => fillDownLifePensionTariff(age, lifePensionTariffOverrides[key] || '0.000')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/cell:opacity-100 p-1.5 hover:bg-blue-100 rounded-lg text-blue-500 transition-all shadow-sm bg-white"
+                                    title="Заполнить вниз"
+                                  >
+                                    <ChevronDown size={14} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+          ) : showDetails === 'Вероятности перевода в др. НПФ' ? (
+            <motion.div
+              key="details-npf-transfer-prob"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="grid grid-cols-12 gap-8">
+                {/* Parameterization Panel */}
+                <div className="col-span-4 space-y-6">
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <div className="flex items-center gap-2 mb-6 text-blue-600">
+                      <Settings size={18} />
+                      <h4 className="font-bold uppercase text-xs tracking-widest">Параметризация</h4>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-3 ml-1">Пол</label>
+                        <div className="flex p-1 bg-slate-100 rounded-xl">
+                          <button 
+                            onClick={() => setNpfTransferParams(p => ({ ...p, gender: 'M' }))}
+                            className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                              npfTransferParams.gender === 'M' 
+                                ? 'bg-white text-blue-600 shadow-sm' 
+                                : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                          >
+                            Мужчины
+                          </button>
+                          <button 
+                            onClick={() => setNpfTransferParams(p => ({ ...p, gender: 'W' }))}
+                            className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                              npfTransferParams.gender === 'W' 
+                                ? 'bg-white text-blue-600 shadow-sm' 
+                                : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                          >
+                            Женщины
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Начальный возраст</label>
+                        <input 
+                          type="number" 
+                          value={npfTransferParams.startAge}
+                          onChange={(e) => setNpfTransferParams(p => ({ ...p, startAge: parseInt(e.target.value) || 0 }))}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Количество строк</label>
+                        <input 
+                          type="number" 
+                          value={npfTransferParams.count}
+                          onChange={(e) => setNpfTransferParams(p => ({ ...p, count: Math.min(100, parseInt(e.target.value) || 1) }))}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-rose-600 rounded-2xl p-6 text-white shadow-lg shadow-rose-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Info size={16} />
+                      <span className="text-xs font-bold uppercase tracking-wider">Описание</span>
+                    </div>
+                    <p className="text-sm leading-relaxed opacity-90">
+                      Вероятность перевода пенсионных накоплений из текущего НПФ в другой фонд. Отражает риск оттока клиентской базы.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Table Area */}
+                <div className="col-span-8 space-y-4">
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50">
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-r border-slate-200 text-center">Возраст</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-r border-slate-200 text-center">Пол</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider text-center">Вероятность</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {Array.from({ length: npfTransferParams.count }).map((_, i) => {
+                            const age = npfTransferParams.startAge + i;
+                            const key = `${age}-${npfTransferParams.gender}`;
+                            return (
+                              <tr key={key} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-6 py-3.5 font-bold text-slate-700 border-r border-slate-100 bg-slate-50/30 text-center">{age}</td>
+                                <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center">
+                                  {npfTransferParams.gender === 'M' ? 'Мужской' : 'Женский'}
+                                </td>
+                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm text-center p-0 relative group/cell">
+                                  <input 
+                                    type="text"
+                                    value={npfTransferOverrides[key] || '0.12%'}
+                                    onChange={(e) => updateNpfTransferOverride(age, npfTransferParams.gender, e.target.value)}
+                                    className="w-full h-full bg-transparent px-6 py-3.5 text-center focus:outline-none focus:bg-blue-50 transition-colors"
+                                  />
+                                  <button 
+                                    onClick={() => fillDownNpfTransfer(age, npfTransferOverrides[key] || '0.12%')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/cell:opacity-100 p-1.5 hover:bg-blue-100 rounded-lg text-blue-500 transition-all shadow-sm bg-white"
+                                    title="Заполнить вниз"
+                                  >
+                                    <ChevronDown size={14} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : showDetails === 'Вероятность перевода из ОПС' ? (
+            <motion.div
+              key="details-ops-transfer-prob"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="grid grid-cols-12 gap-8">
+                {/* Parameterization Panel */}
+                <div className="col-span-4 space-y-6">
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <div className="flex items-center gap-2 mb-6 text-blue-600">
+                      <Settings size={18} />
+                      <h4 className="font-bold uppercase text-xs tracking-widest">Параметризация</h4>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-3 ml-1">Пол</label>
+                        <div className="flex p-1 bg-slate-100 rounded-xl">
+                          <button 
+                            onClick={() => setOpsTransferParams(p => ({ ...p, gender: 'M' }))}
+                            className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                              opsTransferParams.gender === 'M' 
+                                ? 'bg-white text-blue-600 shadow-sm' 
+                                : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                          >
+                            Мужчины
+                          </button>
+                          <button 
+                            onClick={() => setOpsTransferParams(p => ({ ...p, gender: 'W' }))}
+                            className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                              opsTransferParams.gender === 'W' 
+                                ? 'bg-white text-blue-600 shadow-sm' 
+                                : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                          >
+                            Женщины
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Начальный возраст</label>
+                        <input 
+                          type="number" 
+                          value={opsTransferParams.startAge}
+                          onChange={(e) => setOpsTransferParams(p => ({ ...p, startAge: parseInt(e.target.value) || 0 }))}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Количество строк</label>
+                        <input 
+                          type="number" 
+                          value={opsTransferParams.count}
+                          onChange={(e) => setOpsTransferParams(p => ({ ...p, count: Math.min(100, parseInt(e.target.value) || 1) }))}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-indigo-600 rounded-2xl p-6 text-white shadow-lg shadow-indigo-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Info size={16} />
+                      <span className="text-xs font-bold uppercase tracking-wider">Описание</span>
+                    </div>
+                    <p className="text-sm leading-relaxed opacity-90">
+                      Вероятность перевода средств обязательного пенсионного страхования в программу долгосрочных сбережений в зависимости от пола и возраста.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Table Area */}
+                <div className="col-span-8 space-y-4">
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50">
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-r border-slate-200 text-center">Возраст</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-r border-slate-200 text-center">Пол</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider text-center">Вероятность</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {Array.from({ length: opsTransferParams.count }).map((_, i) => {
+                            const age = opsTransferParams.startAge + i;
+                            const key = `${age}-${opsTransferParams.gender}`;
+                            return (
+                              <tr key={key} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-6 py-3.5 font-bold text-slate-700 border-r border-slate-100 bg-slate-50/30 text-center">{age}</td>
+                                <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center">
+                                  {opsTransferParams.gender === 'M' ? 'Мужской' : 'Женский'}
+                                </td>
+                                <td className="px-6 py-3.5 text-slate-600 font-mono text-sm text-center p-0 relative group/cell">
+                                  <input 
+                                    type="text"
+                                    value={opsTransferOverrides[key] || '0.05%'}
+                                    onChange={(e) => updateOpsTransferOverride(age, opsTransferParams.gender, e.target.value)}
+                                    className="w-full h-full bg-transparent px-6 py-3.5 text-center focus:outline-none focus:bg-blue-50 transition-colors"
+                                  />
+                                  <button 
+                                    onClick={() => fillDownOpsTransfer(age, opsTransferOverrides[key] || '0.05%')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/cell:opacity-100 p-1.5 hover:bg-blue-100 rounded-lg text-blue-500 transition-all shadow-sm bg-white"
+                                    title="Заполнить вниз"
+                                  >
+                                    <ChevronDown size={14} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : showDetails === 'Периодичность выплат' ? (
+            <motion.div
+              key="details-payment-freq"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="grid grid-cols-12 gap-8">
+                {/* Info Panel */}
+                <div className="col-span-4 space-y-6">
+                  <div className="bg-indigo-600 rounded-2xl p-6 text-white shadow-lg shadow-indigo-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Info size={16} />
+                      <span className="text-xs font-bold uppercase tracking-wider">Справочник</span>
+                    </div>
+                    <p className="text-sm leading-relaxed opacity-90">
+                      Справочник периодичности выплат. Определяет частоту выплат в году (FREQ) и количество месяцев между выплатами (NUM(FREQ)).
+                    </p>
+                  </div>
+                </div>
+
+                {/* Table Area */}
+                <div className="col-span-8 space-y-4">
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50">
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-r border-slate-200">Периодичность</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-r border-slate-200 text-center">FREQ</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider text-center">NUM(FREQ)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {paymentFreqParams.map((param, index) => (
+                            <tr key={index} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-6 py-3.5 font-bold text-slate-700 border-r border-slate-100 bg-slate-50/30">
+                                <input 
+                                  type="text"
+                                  value={param.periodicity}
+                                  onChange={(e) => updatePaymentFreqParam(index, 'periodicity', e.target.value)}
+                                  className="w-full bg-transparent focus:outline-none focus:bg-blue-50 transition-colors font-bold"
+                                />
+                              </td>
+                              <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center p-0">
+                                <input 
+                                  type="text"
+                                  value={param.freq}
+                                  onChange={(e) => updatePaymentFreqParam(index, 'freq', e.target.value)}
+                                  className="w-full h-full bg-transparent px-6 py-3.5 text-center focus:outline-none focus:bg-blue-50 transition-colors"
+                                />
+                              </td>
+                              <td className="px-6 py-3.5 text-slate-600 font-mono text-sm text-center p-0">
+                                <input 
+                                  type="text"
+                                  value={param.numFreq}
+                                  onChange={(e) => updatePaymentFreqParam(index, 'numFreq', e.target.value)}
+                                  className="w-full h-full bg-transparent px-6 py-3.5 text-center focus:outline-none focus:bg-blue-50 transition-colors"
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : showDetails === 'Параметры по стратегиям' ? (
+            <motion.div
+              key="details-strategy-params"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="grid grid-cols-12 gap-8">
+                {/* Info Panel */}
+                <div className="col-span-4 space-y-6">
+                  <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-lg shadow-slate-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Info size={16} />
+                      <span className="text-xs font-bold uppercase tracking-wider">Инвестиционные стратегии</span>
+                    </div>
+                    <p className="text-sm leading-relaxed opacity-90">
+                      Настройка параметров для различных стратегий ПДС. Позволяет задать накопленный инвестиционный доход и другие финансовые показатели.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Table Area */}
+                <div className="col-span-8 space-y-4">
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50">
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-r border-slate-200">Стратегия</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-r border-slate-200">Параметр</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider">Значение</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {strategyParams.map((param, index) => (
+                            <tr key={index} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-6 py-3.5 font-bold text-slate-700 border-r border-slate-100 bg-slate-50/30">
+                                <input 
+                                  type="text"
+                                  value={param.strategy}
+                                  onChange={(e) => updateStrategyParam(index, 'strategy', e.target.value)}
+                                  className="w-full bg-transparent focus:outline-none focus:bg-blue-50 transition-colors font-bold"
+                                />
+                              </td>
+                              <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100">
+                                <input 
+                                  type="text"
+                                  value={param.parameter}
+                                  onChange={(e) => updateStrategyParam(index, 'parameter', e.target.value)}
+                                  className="w-full bg-transparent focus:outline-none focus:bg-blue-50 transition-colors"
+                                />
+                              </td>
+                              <td className="px-6 py-3.5 text-slate-600 font-mono text-sm p-0">
+                                <input 
+                                  type="text"
+                                  value={param.value}
+                                  onChange={(e) => updateStrategyParam(index, 'value', e.target.value)}
+                                  className="w-full h-full bg-transparent px-6 py-3.5 focus:outline-none focus:bg-blue-50 transition-colors"
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : showDetails === 'Паттерны LIC' ? (
+            <motion.div
+              key="details-lic-patterns"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="grid grid-cols-12 gap-8">
+                {/* Info Panel */}
+                <div className="col-span-4 space-y-6">
+                  <div className="bg-blue-600 rounded-2xl p-6 text-white shadow-lg shadow-blue-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Info size={16} />
+                      <span className="text-xs font-bold uppercase tracking-wider">Инфо</span>
+                    </div>
+                    <p className="text-sm leading-relaxed opacity-90">
+                      Паттерны LIC определяют распределение доплат (ЛВ, ДСВ, ЕВ_ОПС) по месяцам. Значения задаются в процентах от общей суммы доплаты.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Table Area */}
+                <div className="col-span-8 space-y-4">
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50">
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-r border-slate-200 text-center">Тип</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-r border-slate-200 text-center">Месяц</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-slate-700 uppercase tracking-wider text-center">Доля доплаты</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {licPatterns.map((pattern, index) => (
+                            <tr key={index} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-6 py-3.5 font-bold text-slate-700 border-r border-slate-100 bg-slate-50/30 text-center">
+                                <input 
+                                  type="text"
+                                  value={pattern.type}
+                                  onChange={(e) => updateLicPattern(index, 'type', e.target.value)}
+                                  className="w-full h-full bg-transparent text-center focus:outline-none focus:bg-blue-50 transition-colors font-bold"
+                                />
+                              </td>
+                              <td className="px-6 py-3.5 text-slate-600 border-r border-slate-100 text-center p-0">
+                                <input 
+                                  type="text"
+                                  value={pattern.month}
+                                  onChange={(e) => updateLicPattern(index, 'month', e.target.value)}
+                                  className="w-full h-full bg-transparent px-6 py-3.5 text-center focus:outline-none focus:bg-blue-50 transition-colors"
+                                />
+                              </td>
+                              <td className="px-6 py-3.5 text-slate-600 font-mono text-sm text-center p-0">
+                                <input 
+                                  type="text"
+                                  value={pattern.value}
+                                  onChange={(e) => updateLicPattern(index, 'value', e.target.value)}
+                                  className="w-full h-full bg-transparent px-6 py-3.5 text-center focus:outline-none focus:bg-blue-50 transition-colors"
+                                />
+                              </td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
