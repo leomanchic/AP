@@ -23,7 +23,10 @@ import {
   Database,
   GitGraph,
   FileUp,
-  FileDown
+  FileDown,
+  Layers,
+  Zap,
+  Target
 } from 'lucide-react';
 
 // --- Utilities ---
@@ -50,9 +53,10 @@ type ProductType = 'NPO' | 'OPS' | 'PDS' | 'DISCOUNT_RATES' | 'LDM';
 
 interface AssumptionItem {
   label: string;
-  value: string;
+  value?: string;
   description?: string;
   hasDetails?: boolean;
+  isHeader?: boolean;
 }
 
 interface ProductAssumptions {
@@ -64,7 +68,7 @@ interface ProductAssumptions {
 interface CalcParameter {
   id: string;
   label: string;
-  type: 'General' | 'СОЦ РОС' | 'ННПФ';
+  type: 'General' | 'СОЦ РОС' | 'ННПФ' | 'Расширенный' | 'Базовый';
   method: string;
 }
 
@@ -112,6 +116,84 @@ const NPO_CALC_PARAMS: CalcParameter[] = [
   { id: 'VF_type', label: 'Опция оплаты УК и ВФ', type: 'ННПФ', method: 'Опция оплаты УК и ВФ (OLD2024 / NEW2024)' },
 ];
 
+const PDS_CALC_PARAMS: CalcParameter[] = [
+  { id: 'mosof', label: 'Месяц получения софинансирования от СФР', type: 'General', method: 'Выбор месяца из справочника месяцев' },
+  { id: 'OpsTransMon', label: 'Месяц переводов из ОПС', type: 'General', method: 'Выбор месяца из справочника месяцев' },
+  { id: 'ExtTransMon', label: 'Месяц переводов из другого НПФ', type: 'General', method: 'Выбор месяца из справочника месяцев' },
+  { id: 'ev_ops_coef', label: 'Поправочный коэффициент ЕВ из ОПС', type: 'General', method: 'Ввод процента, от 0 до 100' },
+  { id: 'IsFinr', label: 'Флаг учета финансового риска при расчете ИД', type: 'General', method: 'Флаг (1/0)' },
+  { id: 'IfR', label: 'Ставка финансового риска', type: 'General', method: 'Ввод коэффициента' },
+  { id: 'rko_contrib_per', label: 'Процент расходов РКО от взносов', type: 'General', method: 'Ввод процента' },
+  { id: 'max_rko_contrib', label: 'Макс. сумма РКО от взносов для договора', type: 'General', method: 'Ввод суммы' },
+  { id: 'rko_paym_per', label: 'Процент расходов РКО от выплат', type: 'General', method: 'Ввод процента' },
+  { id: 'max_paym_contrib', label: 'Макс. сумма РКО от выплат для договора', type: 'General', method: 'Ввод суммы' },
+  { id: 'InvestMon', label: 'Месяц распределения инвестдохода', type: 'General', method: 'Выбор месяца из справочника месяцев' },
+  { id: 'AsvMon', label: 'Месяц гарантийного взноса в АСВ', type: 'General', method: 'Выбор месяца из справочника месяцев' },
+  { id: 'asv_pr_flg', label: 'Флаг уплаты взносов АСВ за счет средств ПР', type: 'General', method: 'Флаг (1/0)' },
+  { id: 'InvestAllocOpt', label: 'Опция распределения ИД за прошедшие периоды', type: 'General', method: 'Системный выбор' },
+  { id: 'FundExpRate', label: 'Ставка ожидаемого вознаграждения фонда', type: 'General', method: 'Ввод процента' },
+  { id: 'AccumVarPart', label: 'Величина накопл. переменной части вознаграждения', type: 'General', method: 'Ввод суммы' },
+  { id: 'RppoStrategyIncome', label: 'Доход от РППО strategy', type: 'General', method: 'Ввод суммы' },
+  { id: 'TotalBalanceIncome', label: 'Доход от баланса общий', type: 'General', method: 'Ввод суммы' },
+  { id: 'ins_share', label: 'Доля страхового резерва от РППО', type: 'General', method: 'Ввод процента' },
+  { id: 'rops_share', label: 'Доля РОПС от ПН', type: 'General', method: 'Ввод процента' },
+  { id: 'shiftInh', label: 'Сдвиг выплаты правопреемникам', type: 'General', method: 'Ввод месяцев' },
+  { id: 'share_death', label: 'Доля доплаты инвестдохода по умершим', type: 'General', method: 'Ввод процента' },
+  { id: 'share_ev', label: 'Доля доплаты инвестдохода по ЕВ', type: 'General', method: 'Ввод процента' },
+  { id: 'CorrSPVmonth', label: 'Месяц корректировки СПВ', type: 'General', method: 'Выбор месяца из справочника месяцев' },
+  { id: 'CorrPPVmonth', label: 'Месяц корректировки ППВ', type: 'General', method: 'Выбор месяца из справочника месяцев' },
+  { id: 'ClaimPaymPeriod', label: 'Минимальный период обращения за выплатой', type: 'General', method: 'Ввод месяцев' },
+  { id: 'MonthEV', label: 'Месяц получения ЕВ', type: 'General', method: 'Выбор месяца из справочника месяцев' },
+  { id: 'OpTEV', label: 'Опция выплаты ЕВ', type: 'General', method: 'Системный выбор' },
+  { id: 'Bound_t_EV', label: 'Мин. срок договора для получения ЕВ', type: 'General', method: 'Ввод лет' },
+  { id: 'Bound_sum_EV', label: 'Пороговое значение ЕВ', type: 'General', method: 'Ввод суммы' },
+  { id: 'MinTermOGS', label: 'Выжидательный период для ОЖС', type: 'General', method: 'Ввод месяцев' },
+  { id: 'MonthOGS', label: 'Месяц расторжения по ОЖС', type: 'General', method: 'Выбор месяца из справочника месяцев' },
+  { id: 'mNRD', label: 'Месяц уплаты вознаграждения НРД', type: 'General', method: 'Выбор месяца из справочника месяцев' },
+  { id: 'prob_ev', label: 'Доля выбирающих ЕВ', type: 'General', method: 'Ввод процента' },
+  { id: 'prob_spv', label: 'Доля выбирающих СПВ', type: 'General', method: 'Ввод процента' },
+  { id: 'prob_term_pens', label: 'Разовая вер-ть обращения за выплатой', type: 'General', method: 'Ввод процента' },
+  { id: 'YearsTermPens', label: 'Срок действия вер-ти обращения (лет)', type: 'General', method: 'Ввод лет' },
+  { id: 'prob_claim_assur', label: 'Годовая вер-ть обращения участников', type: 'General', method: 'Ввод процента' },
+];
+
+const PDS_BASE_PRODUCT_PARAMS: CalcParameter[] = [
+  { id: 'b_dsv_max', label: 'Максимальная величина софинансирования государством', type: 'Базовый', method: 'Ввод суммы' },
+  { id: 'b_sofin_coef', label: 'Коэффициент софинансирования', type: 'Базовый', method: 'Ввод коэффициента' },
+  { id: 'b_lv_min', label: 'Минимальная сумма личных взносов за прошлый год', type: 'Базовый', method: 'Ввод суммы' },
+  { id: 'b_comission_per', label: 'Процент прямых расходов на КВ', type: 'Базовый', method: 'Ввод процента' },
+  { id: 'b_comission_val', label: 'Величина косвенных расходов на КВ', type: 'Базовый', method: 'Ввод суммы' },
+  { id: 'b_comission_sber_per', label: 'Процент прямых расходов на КВ группа Сбербанка', type: 'Базовый', method: 'Ввод процента' },
+  { id: 'b_comission_sber_val', label: 'Величина косвенных расходов на КВ группа Сбербанка', type: 'Базовый', method: 'Ввод суммы' },
+  { id: 'b_comission_group_per', label: 'Процент прямых расходов на КВ группа кроме Сбербанка', type: 'Базовый', method: 'Ввод процента' },
+  { id: 'b_comission_group_val', label: 'Величина косвенных расходов на КВ группа кроме Сбербанка', type: 'Базовый', method: 'Ввод суммы' },
+  { id: 'b_bound_ev', label: 'Порог для назначения ЕВ', type: 'Базовый', method: 'Ввод суммы' },
+  { id: 'b_Bound', label: 'Верхняя граница по договору', type: 'Базовый', method: 'Ввод суммы' },
+  { id: 'b_MinTransPer', label: 'Минимальный период для перевода в другой НПФ, год', type: 'Базовый', method: 'Ввод лет' },
+  { id: 'b_MonTrans', label: 'Месяц переводов в другие НПФ', type: 'Базовый', method: 'Выбор месяца из справочника месяцев' },
+  { id: 'b_Accume_period', label: 'Минимальный накопительный период', type: 'Базовый', method: 'Ввод месяцев' },
+  { id: 'b_contrib_lv_rate', label: 'Годовой темп роста личных взносов', type: 'Базовый', method: 'Ввод процента' },
+];
+
+const PDS_PRODUCT_PARAMS: CalcParameter[] = [
+  { id: 'dsv_max', label: 'Максимальная величина софинансирования государством', type: 'Расширенный', method: 'Ввод суммы' },
+  { id: 'sofin_coef', label: 'Коэффициент софинансирования', type: 'Расширенный', method: 'Ввод коэффициента' },
+  { id: 'lv_min', label: 'Минимальная сумма личных взносов за прошлый год', type: 'Расширенный', method: 'Ввод суммы' },
+  { id: 'comission_per', label: 'Процент прямых расходов на КВ', type: 'Расширенный', method: 'Ввод процента' },
+  { id: 'comission_val', label: 'Величина косвенных расходов на КВ', type: 'Расширенный', method: 'Ввод суммы' },
+  { id: 'comission_sber_per', label: 'Процент прямых расходов на КВ группа Сбербанка', type: 'Расширенный', method: 'Ввод процента' },
+  { id: 'comission_sber_val', label: 'Величина косвенных расходов на КВ группа Сбербанка', type: 'Расширенный', method: 'Ввод суммы' },
+  { id: 'comission_group_per', label: 'Процент прямых расходов на КВ группа кроме Сбербанка', type: 'Расширенный', method: 'Ввод процента' },
+  { id: 'comission_group_val', label: 'Величина косвенных расходов на КВ группа кроме Сбербанка', type: 'Расширенный', method: 'Ввод суммы' },
+  { id: 'bound_ev', label: 'Порог для назначения ЕВ', type: 'Расширенный', method: 'Ввод суммы' },
+  { id: 'Bound', label: 'Верхняя граница по договору', type: 'Расширенный', method: 'Ввод суммы' },
+  { id: 'MinTMonths', label: 'Минимальный срок выплаты СПВ, месяц', type: 'Расширенный', method: 'Ввод месяцев' },
+  { id: 'MinTransPer', label: 'Минимальный период для перевода в другой НПФ, год', type: 'Расширенный', method: 'Ввод лет' },
+  { id: 'MonTrans', label: 'Месяц переводов в другие НПФ', type: 'Расширенный', method: 'Выбор месяца из справочника месяцев' },
+  { id: 'Accume_period', label: 'Минимальный накопительный период', type: 'Расширенный', method: 'Ввод месяцев' },
+  { id: 'contrib_lv_rate', label: 'Годовой темп роста личных взносов', type: 'Расширенный', method: 'Ввод процента' },
+];
+
 const GENERAL_PARAMS = {
   name: "Актуарный отчет 2026",
   reportingDate: "26.03.2026",
@@ -122,10 +204,12 @@ const ASSUMPTIONS: Record<ProductType, ProductAssumptions> = {
     id: 'NPO',
     title: 'НПО (Негосударственное пенсионное обеспечение)',
     items: [
+      { label: 'Параметры и коэффициенты', isHeader: true },
       { label: 'Параметры расчета', value: 'Параметры расчета НПО', description: 'Базовые константы для ставок и индексации.', hasDetails: true },
       { label: 'Понижающие коэффициенты', value: 'Пониж коэф смертности', description: 'Корректировка таблиц смертности для специфики фонда.', hasDetails: true },
       { label: 'Процент расходов УК, СД, АСВ', value: 'Процент расходов НПО', description: 'Административные и инвестиционные расходы.', hasDetails: true },
       { label: 'Вероятности расторжений', value: 'Вероятность расторжения', description: 'Статистика досрочного прекращения договоров.', hasDetails: true },
+      { label: 'Актуарные таблицы и тарифы', isHeader: true },
       { label: 'Таблица смертности', value: 'Таблица смертности', description: 'Актуарная таблица дожития.', hasDetails: true },
       { label: 'Таблица выхода на пенсию', value: 'Таблица выхода на пенсию', description: 'Распределение вероятностей наступления пенсионных оснований.', hasDetails: true },
       { label: 'Пожизненные тарифы', value: 'пожизненные тарифы', description: 'Актуарные стоимости для аннуитетных выплат.', hasDetails: true },
@@ -137,10 +221,13 @@ const ASSUMPTIONS: Record<ProductType, ProductAssumptions> = {
     id: 'OPS',
     title: 'ОПС (Обязательное пенсионное страхование)',
     items: [
+      { label: 'Основные параметры', isHeader: true },
       { label: 'Параметры расчета', value: 'Параметры расчета ОПС', description: 'Нормативные параметры согласно законодательству.' },
       { label: 'Ставки', value: 'Ставки ОПС', description: 'Инвестиционные ожидания по портфелю ОПС.' },
       { label: 'Процент расходов УК, СД, АСВ', value: 'Процент расходов ОПС', description: 'Установленные лимиты на ведение дел.' },
+      { label: 'Перевод в ПДС', isHeader: true },
       { label: 'Вероятность перевода в ПДС', value: 'Вероятность перевода в ПДС', description: 'Прогноз миграции клиентов в новый продукт ПДС.' },
+      { label: 'Демография и статистика', isHeader: true },
       { label: 'Таблица смертности', value: 'Таблица смертности', description: 'Стандартная таблица для ОПС.', hasDetails: true },
       { label: 'Таблица выхода на пенсию', value: 'Таблица выхода на пенсию', description: 'Возрастные коэффициенты выхода на пенсию.', hasDetails: true },
       { label: 'Коэффициент обращения', value: 'Коэффициент обращения', description: 'Доля застрахованных лиц, обращающихся за выплатой.' },
@@ -150,19 +237,29 @@ const ASSUMPTIONS: Record<ProductType, ProductAssumptions> = {
     id: 'PDS',
     title: 'ПДС (Программа долгосрочных сбережений)',
     items: [
-      { label: 'Параметры расчета', value: 'Параметры расчета ПДС общий', description: 'Общие вводные для новой программы сбережений.' },
-      { label: 'АППониж. Коэффициент к ИД 1 тип', value: 'Пониж коэф 1', description: 'Корректировка инвестдохода для 1 типа.' },
-      { label: 'АППониж. Коэффициент к ИД 2 тип', value: 'Пониж коэф 2', description: 'Корректировка инвестдохода для 2 типа.' },
+      { label: 'Основные и продуктовые настройки', isHeader: true },
+      { label: 'Параметры расчета', value: 'Параметры расчета ПДС общий', description: 'Общие вводные для новой программы сбережений.', hasDetails: true },
+      { label: 'Параметры по продуктам', value: 'Параметры по продуктам ПДС', description: 'Специфические настройки для различных веток ПДС.', hasDetails: true },
+      { label: 'Параметры по продуктам и каналам', value: 'Параметры по продуктам и каналам', description: 'Специфические настройки в разрезе продуктов и каналов продаж.' },
+      { label: 'Параметры по стратегиям', value: 'Параметры по стратегиям', description: 'Инвестиционные и расчетные параметры для различных стратегий размещения.' },
+      { label: 'Паттерны LIC', value: 'Паттерны LIC', description: '(Паттерны распределения доплат ЛВ, ДСВ, ЕВ_ОПС по месяцам)' },
+      { label: 'Периодичность выплат', value: 'Периодичность выплат', description: '(Справочник: ежемесячно, ежеквартально, ежегодно)' },
+      { label: 'Экономические предпосылки', isHeader: true },
+      { label: 'Тарифы', value: 'Тарифы', description: 'Актуарные тарифы для расчета обязательств по ПДС.' },
+      { label: 'Расходы и комиссии', isHeader: true },
+      { label: 'Расходы', value: 'Расходы', description: '(ВГО расходы/доходы, прямые и косвенные расходы в % от СЧА и фиксированных суммах)' },
+      { label: 'Расходы УК, СД, АСВ', value: 'Процент расходов ПДС', description: '(Вознаграждения управляющей компании, спецдепозитария, взносы в АСВ и НРД по годам)', hasDetails: true },
+      { label: 'Технические и актуарные параметры', isHeader: true },
       { label: 'Ставки', value: 'Ставки ПДС', description: 'Целевые показатели доходности ПДС.' },
-      { label: 'Процент расходов УК, СД, АСВ', value: 'Процент расходов ПДС', description: 'Структура издержек по программе.' },
       { label: 'Начисление ИД', value: 'Начисление ИД', description: 'Алгоритм распределения инвестиционного дохода.' },
-      { label: 'Вероятность расторжения', value: 'Вероятность расторжения', description: 'Ожидаемый уровень оттока средств.', hasDetails: true },
-      { label: 'Вероятность расторжения ОЖС', value: 'Вероят. расторжения ОЖС', description: 'Специфические риски для ОЖС.' },
-      { label: 'Вероятность расторжения Трансфер', value: 'Вероят. расторжения Трансфер', description: 'Риски при переводе средств.' },
+      { label: 'Поведенческие декременты', isHeader: true },
+      { label: 'Вероятность расторжения', value: 'Вероятность расторжения', description: '(Зависимость от пола и срока действия договора)', hasDetails: true },
+      { label: 'Вероятность ОЖС', value: 'Вероятность ОЖС', description: '(Особые жизненные ситуации — снятие средств при тяжелых болезнях/потере кормильца)' },
+      { label: 'Вероятность перевода из ОПС', value: 'Вероятность перевода из ОПС', description: '(Вероятность перевода средств обязательного пенсионного страхования в ПДС)' },
+      { label: 'Вероятности перевода в др. НПФ', value: 'Вероятности перевода в др. НПФ', description: '(Риск оттока в другие фонды)' },
+      { label: 'Демографические параметры', isHeader: true },
       { label: 'Таблица смертности', value: 'Таблица смертности', description: 'Базовая демография для ПДС.', hasDetails: true },
-      { label: 'Таблица выхода на пенсию', value: 'Таблица выхода на пенсию', description: 'Условия получения выплат по ПДС.', hasDetails: true },
-      { label: 'Вероятность выбора пенсии', value: 'Вероятность выбора пенсии', description: 'Предпочтения клиентов между единовременной и срочной выплатой.' },
-      { label: 'Коэффициент обращения', value: 'Коэффициент обращения', description: 'Активность участников при достижении условий.' },
+      { label: 'Таблицы дожитий ООН', value: 'Таблицы дожитий ООН', description: '(Прогнозные таблицы ООН по годам и возрастам)' },
     ]
   },
   DISCOUNT_RATES: {
@@ -856,6 +953,16 @@ export default function App() {
     });
   }, [filters]);
 
+  const filteredPdsParams = useMemo(() => {
+    return PDS_CALC_PARAMS;
+  }, []);
+
+  const [pdsProductType, setPdsProductType] = useState<'Базовый' | 'Расширенный'>('Расширенный');
+
+  const filteredPdsProductParams = useMemo(() => {
+    return pdsProductType === 'Базовый' ? PDS_BASE_PRODUCT_PARAMS : PDS_PRODUCT_PARAMS;
+  }, [pdsProductType]);
+
   const handleItemClick = (item: AssumptionItem) => {
     if (item.hasDetails) {
       setShowDetails(item.value);
@@ -987,26 +1094,34 @@ export default function App() {
                     </thead>
                     <tbody>
                       {ASSUMPTIONS[activeTab].items.map((item, idx) => (
-                        <tr key={idx} className="group hover:bg-blue-50/30 transition-colors">
-                          <td className="px-8 py-5 border-b border-slate-100">
-                            <span className="font-semibold text-slate-700">{item.label}</span>
-                          </td>
-                          <td className="px-8 py-5 border-b border-slate-100">
-                            <button 
-                              onClick={() => handleItemClick(item)}
-                              className={`inline-flex items-center gap-2 font-medium transition-all ${
-                                item.hasDetails 
-                                  ? 'text-blue-600 hover:underline cursor-pointer' 
-                                  : 'text-slate-400 cursor-default'
-                              }`}
-                            >
-                              <BarChart3 size={16} />
-                              {item.value}
-                            </button>
-                          </td>
-                          <td className="px-8 py-5 border-b border-slate-100">
-                            <span className="text-sm text-slate-500 leading-relaxed">{item.description}</span>
-                          </td>
+                        <tr key={idx} className={`group transition-colors ${item.isHeader ? 'bg-slate-50/80 cursor-default' : 'hover:bg-blue-50/30'}`}>
+                          {item.isHeader ? (
+                            <td colSpan={3} className="px-8 py-3 border-b border-slate-100">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.label}</span>
+                            </td>
+                          ) : (
+                            <>
+                              <td className="px-8 py-5 border-b border-slate-100">
+                                <span className="font-semibold text-slate-700">{item.label}</span>
+                              </td>
+                              <td className="px-8 py-5 border-b border-slate-100">
+                                <button 
+                                  onClick={() => handleItemClick(item)}
+                                  className={`inline-flex items-center gap-2 font-medium transition-all ${
+                                    item.hasDetails 
+                                      ? 'text-blue-600 hover:underline cursor-pointer' 
+                                      : 'text-slate-400 cursor-default'
+                                  }`}
+                                >
+                                  <BarChart3 size={16} />
+                                  {item.value}
+                                </button>
+                              </td>
+                              <td className="px-8 py-5 border-b border-slate-100">
+                                <span className="text-sm text-slate-500 leading-relaxed">{item.description}</span>
+                              </td>
+                            </>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -1140,6 +1255,247 @@ export default function App() {
                                 param.type === 'General' ? 'bg-slate-100 text-slate-400' :
                                 param.type === 'СОЦ РОС' ? 'bg-orange-100 text-orange-600' :
                                 'bg-purple-100 text-purple-600'
+                              }`}>
+                                {param.type}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          ) : showDetails === 'Параметры расчета ПДС общий' ? (
+            <motion.div
+              key="details-pds-calc"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-800">Параметры расчета ПДС</h3>
+                    <p className="text-sm text-slate-500 mt-1">Основные вводные для Программы Долгосрочных Сбережений</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100">
+                      <BarChart3 size={14} />
+                      {PDS_CALC_PARAMS.length} параметров
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/30">
+                        <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 w-1/4">Параметр</th>
+                        <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 w-1/6">Код (ID)</th>
+                        <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 w-1/4">Способ заполнения</th>
+                        <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 w-1/5">Значение</th>
+                        <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">Тип</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredPdsParams.map((param, idx) => {
+                        const data = getCalcParamData(param.id, param.method);
+                        return (
+                          <tr key={idx} className="group hover:bg-blue-50/30 transition-colors">
+                            <td className="px-8 py-4 border-b border-slate-100">
+                              <span className="font-semibold text-slate-700">{param.label}</span>
+                            </td>
+                            <td className="px-8 py-4 border-b border-slate-100">
+                              <code className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 font-mono">{param.id}</code>
+                            </td>
+                             <td className="px-8 py-4 border-b border-slate-100">
+                              {(param.id.endsWith('Mon') || param.id.endsWith('Cd') || ['Termination', 'DeathTableType', 'InterpolationType', 'EV_flag', 'Contrib_flag', 'OpTEV', 'InvestAllocOpt'].includes(param.id)) ? (
+                                <div className="flex items-center gap-2 text-slate-400 bg-slate-50/50 px-2 py-1 rounded border border-slate-100 w-fit">
+                                  <Database size={12} className="text-blue-500/50" />
+                                  <span className="text-xs font-bold uppercase tracking-wider">
+                                    {param.id.endsWith('Mon') ? 'Справочник месяцев' : 
+                                     param.id.endsWith('Cd') ? 'Выбор типа' : 'Системный выбор'}
+                                  </span>
+                                </div>
+                              ) : param.method === 'Флаг (1/0)' ? (
+                                <div className="flex items-center gap-2 text-slate-400 bg-slate-50/50 px-2 py-1 rounded border border-slate-100 w-fit">
+                                  <Database size={12} className="text-blue-500/50" />
+                                  <span className="text-xs font-bold uppercase tracking-wider">Переключатель</span>
+                                </div>
+                              ) : (
+                                <select 
+                                  value={data.method}
+                                  onChange={(e) => updateCalcParamData(param.id, 'method', e.target.value)}
+                                  className="text-sm text-slate-600 bg-transparent border-none focus:ring-0 cursor-pointer hover:text-blue-600 transition-colors w-full"
+                                >
+                                  {!FILL_METHODS.includes(param.method) && (
+                                    <option value={param.method}>{param.method}</option>
+                                  )}
+                                  {FILL_METHODS.map(m => (
+                                    <option key={m} value={m}>{m}</option>
+                                  ))}
+                                </select>
+                              )}
+                            </td>
+                            <td className="px-8 py-4 border-b border-slate-100">
+                              {param.id.endsWith('Mon') ? (
+                                <select 
+                                  value={data.value}
+                                  onChange={(e) => updateCalcParamData(param.id, 'value', e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                                >
+                                  <option value="">Выберите месяц...</option>
+                                  {MONTHS_LIST.map(m => (
+                                    <option key={m} value={m}>{m}</option>
+                                  ))}
+                                </select>
+                              ) : (param.id === 'IsFinr' || param.id === 'asv_pr_flg') ? (
+                                <select 
+                                  value={data.value}
+                                  onChange={(e) => updateCalcParamData(param.id, 'value', e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                                >
+                                  <option value="1">1 (Включено)</option>
+                                  <option value="0">0 (Выключено)</option>
+                                </select>
+                              ) : (
+                                <input 
+                                  type="text"
+                                  value={data.value}
+                                  placeholder="..."
+                                  onChange={(e) => updateCalcParamData(param.id, 'value', e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                />
+                              )}
+                            </td>
+                            <td className="px-8 py-4 border-b border-slate-100">
+                              <span className="text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tighter bg-slate-100 text-slate-400">
+                                {param.type}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          ) : showDetails === 'Параметры по продуктам ПДС' ? (
+            <motion.div
+              key="details-pds-product"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-800">Параметры по продуктам ПДС</h3>
+                    <p className="text-sm text-slate-500 mt-1">Специфические параметры для веток ПДС (Расширенный и др.)</p>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                      <button
+                        onClick={() => setPdsProductType('Базовый')}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          pdsProductType === 'Базовый'
+                            ? 'bg-white text-blue-600 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        Базовый
+                      </button>
+                      <button
+                        onClick={() => setPdsProductType('Расширенный')}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          pdsProductType === 'Расширенный'
+                            ? 'bg-white text-blue-600 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        Расширенный
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100">
+                      <Layers size={14} />
+                      {filteredPdsProductParams.length} параметров
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/30">
+                        <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 w-1/4">Параметр</th>
+                        <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 w-1/6">Код (ID)</th>
+                        <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 w-1/4">Способ заполнения</th>
+                        <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 w-1/5">Значение</th>
+                        <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">Продукт</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredPdsProductParams.map((param, idx) => {
+                        const data = getCalcParamData(param.id, param.method);
+                        return (
+                          <tr key={idx} className="group hover:bg-blue-50/30 transition-colors">
+                            <td className="px-8 py-4 border-b border-slate-100">
+                              <span className="font-semibold text-slate-700">{param.label}</span>
+                            </td>
+                            <td className="px-8 py-4 border-b border-slate-100">
+                              <code className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 font-mono">{param.id}</code>
+                            </td>
+                            <td className="px-8 py-4 border-b border-slate-100">
+                              {param.id.endsWith('Mon') || param.id.endsWith('Trans') ? (
+                                <div className="flex items-center gap-2 text-slate-400 bg-slate-50/50 px-2 py-1 rounded border border-slate-100 w-fit">
+                                  <Database size={12} className="text-blue-500/50" />
+                                  <span className="text-xs font-bold uppercase tracking-wider">Справочник месяцев</span>
+                                </div>
+                              ) : (
+                                <select 
+                                  value={data.method}
+                                  onChange={(e) => updateCalcParamData(param.id, 'method', e.target.value)}
+                                  className="text-sm text-slate-600 bg-transparent border-none focus:ring-0 cursor-pointer hover:text-blue-600 transition-colors w-full"
+                                >
+                                  {!FILL_METHODS.includes(param.method) && (
+                                    <option value={param.method}>{param.method}</option>
+                                  )}
+                                  {FILL_METHODS.map(m => (
+                                    <option key={m} value={m}>{m}</option>
+                                  ))}
+                                </select>
+                              )}
+                            </td>
+                            <td className="px-8 py-4 border-b border-slate-100">
+                              {param.id.endsWith('Mon') || param.id.endsWith('Trans') ? (
+                                <select 
+                                  value={data.value}
+                                  onChange={(e) => updateCalcParamData(param.id, 'value', e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                                >
+                                  <option value="">Выберите месяц...</option>
+                                  {MONTHS_LIST.map(m => (
+                                    <option key={m} value={m}>{m}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input 
+                                  type="text"
+                                  value={data.value}
+                                  placeholder="..."
+                                  onChange={(e) => updateCalcParamData(param.id, 'value', e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                />
+                              )}
+                            </td>
+                            <td className="px-8 py-4 border-b border-slate-100">
+                              <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tighter ${
+                                param.type === 'Базовый' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'
                               }`}>
                                 {param.type}
                               </span>
@@ -2122,6 +2478,84 @@ export default function App() {
                       Сбросить к расчетным
                     </button>
                   </div>
+
+                  {activeTab === 'PDS' && (
+                    <div className="space-y-6">
+                      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <div className="flex items-center gap-2 mb-6 text-blue-600">
+                          <Zap size={18} />
+                          <h4 className="font-bold uppercase text-xs tracking-widest">Параметры таблицы</h4>
+                        </div>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Настройка интерполяции</label>
+                            <select 
+                              value={getCalcParamData('InterpolationType', 'Системный выбор').value || 'Равномерная'}
+                              onChange={(e) => updateCalcParamData('InterpolationType', 'value', e.target.value)}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                            >
+                              <option value="Равномерная">Равномерная смертность</option>
+                              <option value="Равная интенс.">Равная интенсивность</option>
+                              <option value="Линейная">Линейная</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <div className="flex items-center gap-2 mb-6 text-blue-600">
+                          <Target size={18} />
+                          <h4 className="font-bold uppercase text-xs tracking-widest">Поправка к таблице</h4>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Муж (сниж)</label>
+                              <input 
+                                type="text" 
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"
+                                value={getCalcParamData('mort_corr_m', 'Коэффициент').value || '1.0'}
+                                onChange={(e) => updateCalcParamData('mort_corr_m', 'value', e.target.value)}
+                                placeholder="1.0"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Жен (сниж)</label>
+                              <input 
+                                type="text" 
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"
+                                value={getCalcParamData('mort_corr_f', 'Коэффициент').value || '1.0'}
+                                onChange={(e) => updateCalcParamData('mort_corr_f', 'value', e.target.value)}
+                                placeholder="1.0"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Муж (селект)</label>
+                              <input 
+                                type="text" 
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"
+                                value={getCalcParamData('mort_shift_m', 'Сдвиг').value || '0'}
+                                onChange={(e) => updateCalcParamData('mort_shift_m', 'value', e.target.value)}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Жен (селект)</label>
+                              <input 
+                                type="text" 
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"
+                                value={getCalcParamData('mort_shift_f', 'Сдвиг').value || '0'}
+                                onChange={(e) => updateCalcParamData('mort_shift_f', 'value', e.target.value)}
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Table Area */}
