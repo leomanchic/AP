@@ -26,10 +26,44 @@ import {
   FileDown,
   Layers,
   Zap,
-  Target
+  Target,
+  Plus,
+  Trash2
 } from 'lucide-react';
 
 // --- Utilities ---
+const PARAMETER_LIST = [
+  "Косвенное КВ, сумма",
+  "Косвенное КВ, сумма, ВГО доходы",
+  "Косвенное КВ, сумма, ВГО расходы",
+  "Косвенное КВ, сумма, неВГО расходы",
+  "Поправочный коэффициент личных взносов",
+  "Прямое КВ, % от взносов",
+  "Прямое КВ, % от взносов ВГО доходы",
+  "Прямое КВ, % от взносов ВГО расходы",
+  "Прямое КВ, % от взносов неВГО расходы",
+  "Прямое КВ, сумма",
+  "Прямое КВ, сумма, ВГО доходы",
+  "Прямое КВ, сумма, ВГО расходы",
+  "Прямое КВ, сумма, неВГО расходы",
+  "Темп роста личных взносов"
+];
+
+const PRODUCT_LIST = [
+  "Расширенный",
+  "Базовый"
+];
+
+const CHANNEL_LIST = [
+  "Фонд",
+  "Сбербанк Премьер",
+  "Внешняя дистрибуция",
+  "СБОЛ",
+  "Сбербанк Первый",
+  "Сбербанк Private Banking",
+  "Сбербанк ВСП"
+];
+
 const MONTHS_LIST = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
@@ -240,7 +274,7 @@ const ASSUMPTIONS: Record<ProductType, ProductAssumptions> = {
       { label: 'Основные и продуктовые настройки', isHeader: true },
       { label: 'Параметры расчета', value: 'Параметры расчета ПДС общий', description: 'Общие вводные для новой программы сбережений.', hasDetails: true },
       { label: 'Параметры по продуктам', value: 'Параметры по продуктам ПДС', description: 'Специфические настройки для различных веток ПДС.', hasDetails: true },
-      { label: 'Параметры по продуктам и каналам', value: 'Параметры по продуктам и каналам', description: 'Специфические настройки в разрезе продуктов и каналов продаж.' },
+      { label: 'Параметры по продуктам и каналам', value: 'Параметры по продуктам и каналам', description: 'Специфические настройки в разрезе продуктов и каналов продаж.', hasDetails: true },
       { label: 'Параметры по стратегиям', value: 'Параметры по стратегиям', description: 'Инвестиционные и расчетные параметры для различных стратегий размещения.', hasDetails: true },
       { label: 'Паттерны LIC', value: 'Паттерны LIC', description: '(Паттерны распределения доплат ЛВ, ДСВ, ЕВ_ОПС по месяцам)', hasDetails: true },
       { label: 'Периодичность выплат', value: 'Периодичность выплат', description: '(Справочник: ежемесячно, ежеквартально, ежегодно)', hasDetails: true },
@@ -926,6 +960,43 @@ export default function App() {
     ));
   };
 
+  // Product and Channel Parameters
+  const [productChannelParams, setProductChannelParams] = useState<{
+    id: string,
+    product: string,
+    channel: string,
+    termFrom: string,
+    termTo: string,
+    parameter: string,
+    value: string
+  }[]>([
+    { id: '1', product: 'Базовый', channel: 'Сбербанк ВСП', termFrom: '1', termTo: '10', parameter: 'Прямое КВ, % от взносов', value: '5%' },
+    { id: '2', product: 'Расширенный', channel: 'СБОЛ', termFrom: '1', termTo: '100', parameter: 'Темп роста личных взносов', value: '0.15' }
+  ]);
+
+  const updateProductChannelParam = (id: string, field: string, newVal: string) => {
+    setProductChannelParams(prev => prev.map(item => 
+      item.id === id ? { ...item, [field]: newVal } : item
+    ));
+  };
+
+  const addProductChannelParam = () => {
+    const newId = (Math.max(0, ...productChannelParams.map(p => parseInt(p.id))) + 1).toString();
+    setProductChannelParams(prev => [...prev, {
+      id: newId,
+      product: PRODUCT_LIST[0],
+      channel: CHANNEL_LIST[0],
+      termFrom: '1',
+      termTo: '100',
+      parameter: PARAMETER_LIST[0],
+      value: ''
+    }]);
+  };
+
+  const removeProductChannelParam = (id: string) => {
+    setProductChannelParams(prev => prev.filter(item => item.id !== id));
+  };
+
   // Strategy Parameters
   const [strategyParams, setStrategyParams] = useState<{strategy: string, parameter: string, value: string}[]>([
     { strategy: 'ПДС1', parameter: 'Размер ИД с начала года', value: '20636998952' },
@@ -1530,6 +1601,140 @@ export default function App() {
                       })}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </motion.div>
+          ) : showDetails === 'Параметры по продуктам и каналам' ? (
+            <motion.div
+              key="details-product-channel"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="bg-indigo-600 rounded-2xl p-6 text-white shadow-lg shadow-indigo-100 flex-1 mr-4">
+                    <div className="flex items-center gap-2 mb-2">
+                    <Info size={16} />
+                    <span className="text-xs font-bold uppercase tracking-wider">Интерфейс настройки</span>
+                  </div>
+                    <p className="text-sm leading-relaxed opacity-90">
+                      Настройте параметры в разрезе продуктов и каналов продаж. Вы можете указывать сроки действия договора и типы значений (процент или число). 
+                    </p>
+                  </div>
+                  <button 
+                    onClick={addProductChannelParam}
+                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-indigo-200 active:scale-95 h-full"
+                  >
+                    <Plus size={20} />
+                    <span>Добавить запись</span>
+                  </button>
+                </div>
+
+                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50/50">
+                          <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-r border-slate-200">Продукт</th>
+                          <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-r border-slate-200">Канал продаж</th>
+                          <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-r border-slate-200 text-center">Срок (От)</th>
+                          <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-r border-slate-200 text-center">Срок (До)</th>
+                          <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-r border-slate-200">Параметр</th>
+                          <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Значение</th>
+                          <th className="px-4 py-4 w-16"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {productChannelParams.map((item) => (
+                          <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
+                            <td className="p-0 border-r border-slate-100">
+                              <select 
+                                value={item.product}
+                                onChange={(e) => updateProductChannelParam(item.id, 'product', e.target.value)}
+                                className="w-full px-6 py-4 bg-transparent focus:outline-none focus:bg-indigo-50/30 text-sm font-medium transition-colors appearance-none cursor-pointer"
+                              >
+                                {PRODUCT_LIST.map(p => (
+                                  <option key={p} value={p}>{p}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="p-0 border-r border-slate-100">
+                              <select 
+                                value={item.channel}
+                                onChange={(e) => updateProductChannelParam(item.id, 'channel', e.target.value)}
+                                className="w-full px-6 py-4 bg-transparent focus:outline-none focus:bg-indigo-50/30 text-sm text-slate-600 transition-colors appearance-none cursor-pointer"
+                              >
+                                {CHANNEL_LIST.map(c => (
+                                  <option key={c} value={c}>{c}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="p-0 border-r border-slate-100 w-24">
+                              <input 
+                                type="text"
+                                value={item.termFrom}
+                                onChange={(e) => updateProductChannelParam(item.id, 'termFrom', e.target.value)}
+                                className="w-full px-4 py-4 bg-transparent text-center focus:outline-none focus:bg-indigo-50/30 text-sm font-mono transition-colors"
+                              />
+                            </td>
+                            <td className="p-0 border-r border-slate-100 w-24">
+                              <input 
+                                type="text"
+                                value={item.termTo}
+                                onChange={(e) => updateProductChannelParam(item.id, 'termTo', e.target.value)}
+                                className="w-full px-4 py-4 bg-transparent text-center focus:outline-none focus:bg-indigo-50/30 text-sm font-mono transition-colors"
+                              />
+                            </td>
+                            <td className="p-0 border-r border-slate-100">
+                              <select 
+                                value={item.parameter}
+                                onChange={(e) => updateProductChannelParam(item.id, 'parameter', e.target.value)}
+                                className="w-full px-6 py-4 bg-transparent focus:outline-none focus:bg-indigo-50/30 text-sm text-slate-600 transition-colors font-medium appearance-none cursor-pointer"
+                              >
+                                <option value="" disabled>Выберите параметр</option>
+                                {PARAMETER_LIST.map(param => (
+                                  <option key={param} value={param}>{param}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="p-0 w-32">
+                              <input 
+                                type="text"
+                                value={item.value}
+                                onChange={(e) => updateProductChannelParam(item.id, 'value', e.target.value)}
+                                placeholder="0.00"
+                                className="w-full px-6 py-4 bg-transparent text-center focus:outline-none focus:bg-indigo-50/30 text-sm font-bold text-indigo-600 transition-colors"
+                              />
+                            </td>
+                            <td className="px-4 text-center">
+                              <button 
+                                onClick={() => removeProductChannelParam(item.id)}
+                                className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {productChannelParams.length === 0 && (
+                      <div className="py-20 text-center">
+                        <div className="bg-slate-50 w-16 h-16 rounded-3xl flex items-center justify-center mx-auto mb-4 text-slate-300">
+                          <Settings size={24} />
+                        </div>
+                        <p className="text-slate-400 font-medium">Нет добавленных параметров</p>
+                        <button 
+                          onClick={addProductChannelParam}
+                          className="mt-4 text-indigo-600 font-bold hover:underline"
+                        >
+                          Добавить первую запись
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </motion.div>
