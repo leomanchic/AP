@@ -122,7 +122,7 @@ const ASSUMPTIONS: Record<ProductType, ProductAssumptions> = {
     id: 'NPO',
     title: 'НПО (Негосударственное пенсионное обеспечение)',
     items: [
-      { label: 'Параметры расчета', value: 'Параметры расчета НПО', description: 'Базовые константы для дисконтирования и индексации.', hasDetails: true },
+      { label: 'Параметры расчета', value: 'Параметры расчета НПО', description: 'Базовые константы для ставок и индексации.', hasDetails: true },
       { label: 'Понижающие коэффициенты', value: 'Пониж коэф смертности', description: 'Корректировка таблиц смертности для специфики фонда.', hasDetails: true },
       { label: 'Процент расходов УК, СД, АСВ', value: 'Процент расходов НПО', description: 'Административные и инвестиционные расходы.', hasDetails: true },
       { label: 'Вероятности расторжений', value: 'Вероятность расторжения', description: 'Статистика досрочного прекращения договоров.', hasDetails: true },
@@ -495,7 +495,7 @@ const LDMView = () => {
                   {/* Outputs */}
                   <div className="col-start-3 row-start-2 space-y-12 w-full text-left pl-12">
                     {[
-                      { label: "Утв. сетка ставок", desc: "Для дисконтирования" },
+                      { label: "Утв. сетка ставок", desc: "Для ставок" },
                       { label: "Прогноз обязательств", desc: "Резервы НПО/ОПС" },
                       { label: "Отчетность", desc: "Актарное заключение" }
                     ].map((out, i) => (
@@ -594,7 +594,7 @@ export default function App() {
   const [ratesParams, setRatesParams] = useState({
     startYear: 2024,
     step: 1,
-    count: 30,
+    count: 3,
     viewMode: 'years' as 'years' | 'months',
     saveFor100Years: false
   });
@@ -898,7 +898,7 @@ export default function App() {
           />
           <SidebarItem 
             id="DISCOUNT_RATES" 
-            label="Ставки дисконтирования" 
+            label="Ставки" 
             active={activeTab === 'DISCOUNT_RATES'} 
             onClick={() => { setActiveTab('DISCOUNT_RATES'); setShowDetails(null); }}
             icon={BarChart3}
@@ -1433,7 +1433,7 @@ export default function App() {
                     <div className="px-8 py-5 border-b border-slate-100 bg-[#92D050]/10 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <div className="w-2 h-8 bg-[#92D050] rounded-full"></div>
-                        <h3 className="font-bold text-slate-800">Ставки дисконтирования</h3>
+                        <h3 className="font-bold text-slate-800">Ставки</h3>
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
